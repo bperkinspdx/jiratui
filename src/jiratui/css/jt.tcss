@@ -1246,49 +1246,11 @@ ViewAttachmentScreen > VerticalScroll > Center {
     }
 }
 
-/* Screen to create git branches */
-GitScreen {
-    align: center middle;
-    background: $background 80%;
-}
-
-GitScreen > Vertical {
-    width: 70%;
-    height: 50%;
-    border: round $foreground;
-    padding: 1 1;
-    scrollbar-size-vertical: 1;
-}
-
-#target-repo-message {
-    color: $success;
-    padding: 0 1;
-}
-
-#error-message {
-    color: $error;
-    padding: 0 1;
-}
-
-GitBranchNameInput {
-    box_sizing: content-box;
+/* Bar listing the configured views */
+ViewsBar {
     height: 1;
-    border: round $accent;
-    width: 60;
-    margin: 1 0;
     padding: 0 1;
-    background: $background;
-    &:focus {
-        border: round $accent-lighten-3;
-    }
-}
-
-GitRepositorySelectionWidget {
-    border: round $accent;
-    padding: 0 1;
-    &:focus-within {
-        border: round $accent-lighten-3;
-    }
+    color: $text-muted;
 }
 
 /* Screen for logging work */

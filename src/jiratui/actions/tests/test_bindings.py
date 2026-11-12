@@ -166,8 +166,14 @@ def test_standard_action_copy_content():
     assert KEY_BINDINGS_STANDARD.get(SupportedActions.COPY_CONTENT.value).get('keys') == ['c']
 
 
-def test_standard_action_create_git_branch():
-    assert KEY_BINDINGS_STANDARD.get(SupportedActions.CREATE_GIT_BRANCH.value).get('keys') == ['f6']
+def test_standard_action_load_view():
+    assert KEY_BINDINGS_STANDARD.get(SupportedActions.LOAD_VIEW.value).get('keys') == [
+        f'alt+{position}' for position in range(1, 10)
+    ]
+
+
+def test_standard_action_reload_view():
+    assert KEY_BINDINGS_STANDARD.get(SupportedActions.RELOAD_VIEW.value).get('keys') == ['alt+r']
 
 
 def test_standard_action_filter():
@@ -535,10 +541,14 @@ def test_legacy_action_copy_issue_url():
     assert KEY_BINDINGS_LEGACY.get(SupportedActions.COPY_ISSUE_URL.value).get('keys') == ['ctrl+j']
 
 
-def test_legacy_action_create_git_branch():
-    assert KEY_BINDINGS_LEGACY.get(SupportedActions.CREATE_GIT_BRANCH.value).get('keys') == [
-        'ctrl+g'
+def test_legacy_action_load_view():
+    assert KEY_BINDINGS_LEGACY.get(SupportedActions.LOAD_VIEW.value).get('keys') == [
+        f'alt+{position}' for position in range(1, 10)
     ]
+
+
+def test_legacy_action_reload_view():
+    assert KEY_BINDINGS_LEGACY.get(SupportedActions.RELOAD_VIEW.value).get('keys') == ['alt+r']
 
 
 def test_legacy_action_filter():

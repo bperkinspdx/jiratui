@@ -17,3 +17,8 @@
 
 ```{autodoc2-object} jiratui.widgets.search.SearchResultsContainer
 ```
+
+## ViewsBar
+
+```{autodoc2-object} jiratui.widgets.views.ViewsBar
+```

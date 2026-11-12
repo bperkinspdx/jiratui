@@ -57,7 +57,6 @@ from jiratui.widgets.screens.context_menu import (
     ContextMenuOptionAction,
     ContextMenuSelection,
 )
-from jiratui.widgets.screens.git import GitScreen
 from jiratui.widgets.screens.history import HistoryScreen
 from jiratui.widgets.screens.text_search import TextSearchScreen
 from jiratui.widgets.screens.work_item_quick_view import WorkItemQuickViewScreen
@@ -66,12 +65,16 @@ from jiratui.widgets.search import (
     IssuesSearchResultsTable,
     SearchResultsContainer,
 )
+from jiratui.widgets.views import ViewsBar
 from jiratui.widgets.work_item_details.details import IssueDetailsWidget
 from jiratui.widgets.work_item_info.info import WorkItemInfoContainer
 from jiratui.widgets.work_item_subtasks.subtasks import (
     SubtasksWidget,
     WorkItemSubtasks,
 )
+
+VIEWS_WORKER_GROUP = 'views'
+"""Loading a view cancels only an earlier view load, never the workers that fill the search filters."""
 
 
 @dataclass
@@ -92,7 +95,7 @@ class MainScreen(Actionable, Screen):
     - handling the logic for creating work items
     - handling the logic for copying the key of the currently selected work item
     - handling the logic for copying the url of the currently selected work item
-    - handling the logic for creating a local Git branch for the currently selected work item
+    - loading the work-item views defined in the configuration
     - searching Jira users for the assignee input filter
     - searching projects for the project input
     - searching types of issues for the issue type input filter
@@ -136,7 +139,7 @@ class MainScreen(Actionable, Screen):
         SupportedActions.FIND_BY_TEXT,
         SupportedActions.CREATE_WORK_ITEM,
         SupportedActions.SHOW_RECENT_HISTORY,
-        SupportedActions.CREATE_GIT_BRANCH,
+        SupportedActions.RELOAD_VIEW,
     ]:
         data = key_bindings.get(supported_action_id.value, {})
         ACTIONS.append(
@@ -150,15 +153,23 @@ class MainScreen(Actionable, Screen):
         )
 
     BINDINGS = [
-        Binding(
-            key=','.join(action.keys),
-            action=action.action,
-            show=action.show,
-            description=action.description or '',
-            tooltip=action.tooltip,
-        )
-        for action in ACTIONS
-        if isinstance(action.action, str)
+        *[
+            Binding(
+                key=','.join(action.keys),
+                action=action.action,
+                show=action.show,
+                description=action.description or '',
+                tooltip=action.tooltip,
+            )
+            for action in ACTIONS
+            if isinstance(action.action, str)
+        ],
+        *[
+            Binding(key=key, action=f'load_view({position})', show=False)
+            for position, key in enumerate(
+                key_bindings.get(SupportedActions.LOAD_VIEW.value, {}).get('keys', []), start=1
+            )
+        ],
     ]
 
     def __init__(
@@ -187,6 +198,9 @@ class MainScreen(Actionable, Screen):
         """The position of the work item to focus and open on startup. Requires search_on_startup to be enabled."""
         self.current_loaded_work_item_key: str | None = None
         """Track the currently loaded work item key to prevent redundant reloads."""
+        self.active_view: int | None = None
+        """The 1-based position in `config.views` of the view the search results show; `None` after any other
+        search."""
         self.current_key_bindings: dict[str, dict] = get_application_key_bindings()
         self.work_item_tabs_titles: dict = {}
         if self.app.config.show_keybinding_hints:  # type:ignore[attr-defined]
@@ -293,6 +307,10 @@ class MainScreen(Actionable, Screen):
     @property
     def loading_container(self) -> LoadingIndicator:
         return self.query_one('#main-screen-loading-container', expect_type=LoadingIndicator)
+
+    @property
+    def views_bar(self) -> ViewsBar | None:
+        return self.query_one_optional(ViewsBar)
 
     def compose(self) -> ComposeResult:
         """Composes the widgets of the application's main screen.
@@ -403,6 +421,14 @@ class MainScreen(Actionable, Screen):
                     compact=True,
                 )
             yield loading_container
+            if views := self.app.config.views:  # type:ignore[attr-defined]
+                yield ViewsBar(
+                    labels=[view.label for view in views],
+                    keys=self.current_key_bindings.get(SupportedActions.LOAD_VIEW.value, {}).get(
+                        'keys', []
+                    ),
+                    show_keys=self.app.config.show_keybinding_hints,  # type:ignore[attr-defined]
+                )
             with Horizontal():
                 with SearchResultsContainer(
                     id='search_results_container',
@@ -451,8 +477,10 @@ class MainScreen(Actionable, Screen):
           or an initial project key is provided.
         - Fetch statuses: runs as a worker unless configured to only fetch projects on startup
           or an initial project key is provided.
-        - Fetch work items (search): runs as a worker if `search_on_startup` is enabled, after
-          waiting for dependent workers to complete.
+        - Load view: runs as a worker if `startup_view` names a configured view; it takes the place of
+          the startup search and needs none of the filters, so it does not wait for the other workers.
+        - Fetch work items (search): runs as a worker if `search_on_startup` is enabled and no startup
+          view is loaded, after waiting for dependent workers to complete.
         - Focus item: Runs as a worker if `focus_item_on_startup` is specified, after waiting
           for the search to complete.
 
@@ -472,6 +500,7 @@ class MainScreen(Actionable, Screen):
 
         **Configuration Dependencies:**
         - `on_start_up_only_fetch_projects`: If True, skips fetching issue types and statuses.
+        - `startup_view`: The 1-based position in `views` of the view to load on startup.
         - `search_on_startup`: If True, triggers a work item search after initial data is loaded.
         - `pre_defined_jql_expressions`: Dictionary of JQL expressions keyed by expression ID.
 
@@ -480,7 +509,8 @@ class MainScreen(Actionable, Screen):
         2. Fetch issue types and statuses (conditionally, in parallel).
         3. Fetch and set user details (conditionally).
         4. Load and set JQL expression (conditionally).
-        5. Trigger search and focus item (conditionally, with proper await sequencing).
+        5. Load the startup view, or else trigger the search, and focus item (conditionally, with proper await
+           sequencing).
 
         See the following workflow diagram for an overview.
 
@@ -503,10 +533,14 @@ class MainScreen(Actionable, Screen):
             NotifyWarning --> CheckJQL
             CheckJQL{"initial_jql_expression_id<br/>is set AND<br/>pre_defined_jql_expressions exist?"}
             CheckJQL -->|Yes| GetExpression{"Get expression from<br/>pre_defined_jql_expressions?"}
-            CheckJQL -->|No| CheckSearchOnStartup
+            CheckJQL -->|No| CheckStartupView
             GetExpression -->|Found| SetExpression["Set jql_expression_input<br/>with expression<br/>Clean: replace newlines/tabs"]
-            GetExpression -->|Not Found| CheckSearchOnStartup
-            SetExpression --> CheckSearchOnStartup
+            GetExpression -->|Not Found| CheckStartupView
+            SetExpression --> CheckStartupView
+            CheckStartupView{"startup_view names<br/>a configured view?"}
+            CheckStartupView -->|Yes| LoadView["Run Worker: Load View<br/>(exclusive in the views group)"]
+            CheckStartupView -->|No| CheckSearchOnStartup
+            LoadView --> CheckFocusItem
             CheckSearchOnStartup{"search_on_startup<br/>is enabled?"}
             CheckSearchOnStartup -->|No| End([End])
             CheckSearchOnStartup -->|Yes| WaitWorkers["Wait for workers to complete<br/>(projects, issue types, statuses)"]
@@ -515,6 +549,8 @@ class MainScreen(Actionable, Screen):
             CheckFocusItem -->|No| End
             CheckFocusItem -->|Yes| WaitSearch["Wait for search worker<br/>to complete"]
             WaitSearch --> FocusItem["Run Worker: Focus Item<br/>on Startup"]
+            CheckFocusItem -->|Yes, after a view| WaitView["Wait for view worker<br/>to complete"]
+            WaitView --> FocusItem
             FocusItem --> End
         ```
 
@@ -558,8 +594,15 @@ class MainScreen(Actionable, Screen):
                     '\t', ' '
                 )
 
+        if startup_view := self._startup_view_position():
+            view_worker = self.run_worker(
+                self.load_view(startup_view), exclusive=True, group=VIEWS_WORKER_GROUP
+            )
+            if self.focus_item_on_startup:
+                await self.app.workers.wait_for_complete([view_worker])
+                self.run_worker(self._focus_item_after_startup(self.focus_item_on_startup))
         # Trigger search on startup if enabled
-        if self.app.config.search_on_startup:  # type:ignore[attr-defined]
+        elif self.app.config.search_on_startup:  # type:ignore[attr-defined]
             # make sure to wait for the related workers so the method that searches work items have the necessary
             # filters set up, e.g. the selected project (if any) and the selected users (if any)
             await self.app.workers.wait_for_complete(workers)
@@ -1036,25 +1079,118 @@ class MainScreen(Actionable, Screen):
 
     # NEW - Actionable Logic
 
+    def _clear_work_item_panes(self) -> None:
+        """Empties every pane that shows the selected work item, so the next selection fetches it afresh."""
+
+        self.current_loaded_work_item_key = None
+        self.issue_info_container.clear_information = True
+        self.issue_details_widget.issue = None
+        self.issue_comments_widget.comments = None
+        self.related_issues_widget.issues = None
+        self.issue_remote_links_widget.issue_key = None
+        self.issue_attachments_widget.attachments = None
+        self.issue_child_work_items_widget.issues = None
+
+    def _set_active_view(self, position: int | None) -> None:
+        """Marks the view at `position` as the one the search results show, or no view when `position` is `None`."""
+
+        self.active_view = position
+        if views_bar := self.views_bar:
+            views_bar.active_view = position
+        title = self.work_item_tabs_titles.get('search_results_container') or 'Work Items'
+        if position is not None:
+            title = f'{title} · {self.app.config.views[position - 1].label}'  # type:ignore[attr-defined]
+        self.search_results_container.border_title = title
+
+    def _startup_view_position(self) -> int | None:
+        """Returns the position of the configured startup view, or `None` when no configured view is set to load."""
+
+        if (position := self.app.config.startup_view) is None:  # type:ignore[attr-defined]
+            return None
+        views = self.app.config.views or []  # type:ignore[attr-defined]
+        if 1 <= position <= len(views):
+            return position
+        self.notify(
+            f'startup_view is {position} but {len(views)} views are configured.',
+            title='Views',
+            severity='warning',
+        )
+        return None
+
+    def action_load_view(self, position: int) -> None:
+        """Loads the view at `position` (1-based) in `config.views`; positions past the last view do nothing."""
+
+        if 1 <= position <= len(self.app.config.views or []):  # type:ignore[attr-defined]
+            self.run_worker(self.load_view(position), exclusive=True, group=VIEWS_WORKER_GROUP)
+
+    def action_reload_view(self) -> None:
+        """Loads the active view again."""
+
+        if self.active_view is None:
+            self.notify('No view is active. Load one with its key first.', title='Views')
+            return
+        self.action_load_view(self.active_view)
+
+    async def load_view(self, position: int) -> None:
+        """Searches every work item of the view at `position` and shows them, unpaged, in the search results.
+
+        Args:
+            position: the 1-based position of the view in `config.views`.
+
+        Returns:
+            None
+        """
+
+        view = self.app.config.views[position - 1]  # type:ignore[attr-defined]
+        self._clear_work_item_panes()
+        self._set_active_view(position)
+        self.run_button.loading = True
+        try:
+            response: APIControllerResponse = await self.api.search_view_work_items(
+                view,
+                fields=get_work_item_search_fields(
+                    self.app.config.search_results_columns  # type:ignore[attr-defined]
+                ),
+                max_results=self.app.config.view_max_results,  # type:ignore[attr-defined]
+            )
+        finally:
+            self.run_button.loading = False
+        if self.active_view != position:
+            return
+        if not response.success or response.result is None:
+            self.notify(
+                response.error or 'The view could not be searched.',
+                title=view.label,
+                severity='error',
+            )
+            return
+        results: JiraIssueSearchResponse = response.result
+        table = self.search_results_table
+        table.page = 1
+        table.token_by_page = {}
+        table.set_initial_results_set(results)
+        table.search_results = results
+        table.focus()
+        self.search_results_container.pagination = {
+            'total': len(results.issues),
+            'current_page_number': 1,
+            'paged': False,
+        }
+        if views_bar := self.views_bar:
+            views_bar.set_count(position, len(results.issues))
+        if results.is_last is False:
+            self.notify(
+                f'Showing the first {len(results.issues)} work items. Raise view_max_results to load more.',
+                title=view.label,
+                severity='warning',
+            )
+
     async def action_search(self, search_term: str | None = None) -> None:
         """Handles the event  when the user presses the "search" button."""
 
-        # reset the key of the currently loaded issue to avoid not fetching the selected issue again after searching
-        self.current_loaded_work_item_key = None
-        # clear the information pane
-        self.issue_info_container.clear_information = True
-        # clear the details pane
-        self.issue_details_widget.issue = None
-        # clear the comments
-        self.issue_comments_widget.comments = None
-        # clear related issues
-        self.related_issues_widget.issues = None
-        # clear the web links
-        self.issue_remote_links_widget.issue_key = None
-        # clear the attachments
-        self.issue_attachments_widget.attachments = None
-        # clear the subtasks
-        self.issue_child_work_items_widget.issues = None
+        self.app.workers.cancel_group(self, VIEWS_WORKER_GROUP)
+        self._set_active_view(None)
+        self._clear_work_item_panes()
         # reset the current page
         self.search_results_table.page = 1
         # clear the token-based pagination control
@@ -1141,11 +1277,6 @@ class MainScreen(Actionable, Screen):
             self.app.copy_to_clipboard(self.search_results_table.current_work_item_key)
             self.notify('Work item Key copied!')
 
-    def action_create_git_branch(self) -> None:
-        """Opens up a modal screen to allow the user to create Git branches."""
-        if (table := self.search_results_table) and table.current_work_item_key:
-            self.run_worker(self._open_git_screen(table.current_work_item_key))
-
     async def action_create_work_item(self) -> None:
         """Handles the event to create a new work item."""
         await self.app.push_screen(
@@ -1160,18 +1291,13 @@ class MainScreen(Actionable, Screen):
         """Check if an action may run."""
 
         if table := self.query_one_optional(IssuesSearchResultsTable):
-            if action == 'create_git_branch' and table and not table.current_work_item_key:
-                return False
-            elif action == 'copy_issue_key' and table and not table.current_work_item_key:
+            if action == 'copy_issue_key' and table and not table.current_work_item_key:
                 return False
             elif action == 'copy_issue_url' and table and not table.current_work_item_key:
                 return False
         return True
 
     # END - Actionable Logic
-
-    async def _open_git_screen(self, work_item_key: str) -> None:
-        await self.app.push_screen(GitScreen(work_item_key))
 
     @on(SubtasksWidget.CreateSubtask)
     async def _create_work_item_subtask(self, message: SubtasksWidget.CreateSubtask) -> None:
@@ -1419,7 +1545,7 @@ class MainScreen(Actionable, Screen):
         while attempt < max_attempts:
             await self.app.animator.wait_for_idle()
             await asyncio.sleep(0.1)
-            row_count = len(table.rows)
+            row_count = table.work_item_count
             if row_count > 0:
                 break
             attempt += 1
@@ -1442,8 +1568,13 @@ class MainScreen(Actionable, Screen):
             )
             return
 
-        # Convert 1-based position to 0-based index
-        row_index = position - 1
+        if (row_index := table.row_index_for_position(position)) is None:
+            self.notify(
+                f'Work item {position} is in a collapsed section. Expand its section to open it.',
+                severity='warning',
+                title='Focus Work Item',
+            )
+            return
 
         # Move cursor to this row
         table.move_cursor(row=row_index)

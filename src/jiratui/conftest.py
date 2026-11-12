@@ -27,6 +27,10 @@ from jiratui.models import (
 def config_for_testing() -> ApplicationConfiguration:
     config_mock = Mock(spec=ApplicationConfiguration)
     config_mock.configure_mock(
+        views=None,
+        startup_view=None,
+        view_max_results=200,
+        status_sections=None,
         jira_api_base_url='foo.bar',
         jira_base_url='foo.bar',
         jira_api_username='foo',
@@ -64,6 +68,10 @@ def config_for_testing() -> ApplicationConfiguration:
 def config_for_testing_jira_dc() -> ApplicationConfiguration:
     config_mock = Mock(spec=ApplicationConfiguration)
     config_mock.configure_mock(
+        views=None,
+        startup_view=None,
+        view_max_results=200,
+        status_sections=None,
         jira_api_base_url='foo.bar',
         jira_api_username='foo',
         jira_api_token=SecretStr('bar'),
@@ -98,6 +106,10 @@ def config_for_testing_jira_dc() -> ApplicationConfiguration:
 def jira_api_controller() -> APIController:
     config_mock = Mock(spec=ApplicationConfiguration)
     config_mock.configure_mock(
+        views=None,
+        startup_view=None,
+        view_max_results=200,
+        status_sections=None,
         jira_api_base_url='foo.bar',
         jira_api_username='foo',
         jira_api_token=SecretStr('bar'),
@@ -133,6 +145,10 @@ def jira_api_controller() -> APIController:
 def jira_api_controller_for_jira_dc() -> APIController:
     config_mock = Mock(spec=ApplicationConfiguration)
     config_mock.configure_mock(
+        views=None,
+        startup_view=None,
+        view_max_results=200,
+        status_sections=None,
         jira_api_base_url='foo.bar',
         jira_api_username='foo',
         jira_api_token=SecretStr('bar'),
@@ -170,6 +186,10 @@ def app():
 
     config_mock = Mock(spec=ApplicationConfiguration)
     config_mock.configure_mock(
+        views=None,
+        startup_view=None,
+        view_max_results=200,
+        status_sections=None,
         jira_api_base_url='foo.bar',
         jira_api_username='foo',
         jira_api_token=SecretStr('bar'),

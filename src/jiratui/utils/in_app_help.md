@@ -26,7 +26,8 @@ context.
 | `f3`         | View the configuration file                            | Main Screen                                                             |
 | `f4`         | Shows the recent history                               | Main Screen                                                             |
 | `f5`         | View items related to the currently selected work item | Main Screen                                                             |
-| `f6`         | Creates a Git branch for a work item                   | Main Screen                                                             |
+| `alt+1`…`alt+9` | Loads the configured view in that position          | Main Screen                                                             |
+| `alt+r`      | Loads the active view again                            | Main Screen                                                             |
 | `alt+p`      | Focuses the project dropdown                           | Main Screen                                                             |
 | `alt+t`      | Focuses the work item types dropdown                   | Main Screen                                                             |
 | `alt+s`      | Focuses the work item statuses dropdown                | Main Screen                                                             |
@@ -128,7 +129,8 @@ context.
 | `f7`                    | Shows the recent history                                 |         |
 | `^k`                    | Copy the work item key                                   |         |
 | `^j`                    | Copy the work item URL                                   |         |
-| `^g`                    | Creates a Git branch for a work item                     |         |
+| `alt+1`…`alt+9`         | Loads the configured view in that position               |         |
+| `alt+r`                 | Loads the active view again                              |         |
 | `.`                     | Filter work items in the search results table            |         |
 | `alt+left`              | Go to the previous page                                  |         |
 | `alt+right`             | Go to the next page                                      |         |
@@ -341,12 +343,24 @@ type in the name in the search box "Assignee" at the top of the app. Users are f
 their display name. If you select a project from the "Projects" dropdown then users will be filtered by the project's
 key in addition to being filtered by their name/email address.
 
-# Creating Git Branches
+# Views
 
-If you want to create a Git branch for a work item you can do so by selecting the work item in the search results and
-then pressing the key for the action `create_git_branch`. This will open a pop-up screen and will allow you to specify
-the target repository and the name of the branch. The list of available repositories is controlled by the configuration
-variable `git_repositories`.
+A view is a named search defined in the configuration variable `views`. The views bar above the search results lists
+them; `alt+1` loads the first, `alt+2` the second, and so on up to the ninth, and clicking a view loads it too. A view
+loads all its work items, up to `view_max_results`, as one list instead of pages, and the bar shows how many it
+loaded. `alt+r` loads the active view again. Any other search replaces the view, and the bar shows no view as active.
+
+A view with `related_to` selects the sub-tasks of, and the work items linked to, the work items its `related_to` JQL
+selects; its `jql` then narrows them, e.g. to bugs.
+
+Setting `startup_view` to a view's position loads that view when the app starts.
+
+# Status Sections
+
+When the configuration variable `status_sections` is set, the search results are grouped into those sections, each
+under a heading with its label and the number of its work items. Pressing `enter` on a heading collapses or expands its
+section; a section configured with `collapsed: true` starts collapsed. A status that no section names gets a section
+of its own after the configured ones. Work items keep their numbers whether or not their section is collapsed.
 
 # Creating Work Items
 

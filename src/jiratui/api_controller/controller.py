@@ -25,7 +25,7 @@ from jiratui.api_controller.constants import (
     RECORDS_PER_PAGE_SEARCH_USERS_ASSIGNABLE_TO_PROJECTS,
 )
 from jiratui.api_controller.factories import WorkItemFactory
-from jiratui.config import CONFIGURATION, ApplicationConfiguration
+from jiratui.config import CONFIGURATION, ApplicationConfiguration, WorkItemsViewConfiguration
 from jiratui.constants import (
     ATTACHMENT_MAXIMUM_FILE_SIZE_IN_BYTES,
     DEFAULT_JIRA_API_VERSION,
@@ -81,6 +81,10 @@ from jiratui.utils.adf import convert_markdown_to_adf
 from jiratui.utils.logging import JiraTUILogger
 from jiratui.utils.mentions import expand_mention_tokens
 from jiratui.utils.search import DEFAULT_WORK_ITEM_SEARCH_FIELDS
+from jiratui.utils.views import build_related_view_jql, build_view_jql
+
+VIEW_SEARCH_CLOUD_PAGE_SIZE = 100
+"""The largest page Jira Cloud's JQL search returns when work items carry more fields than their id and key."""
 
 
 @dataclass
@@ -1265,6 +1269,103 @@ class APIController:
                 is_last=response.get('isLast'),
                 total=response.get('total'),
                 offset=response.get('startAt'),
+            )
+        )
+
+    async def search_view_work_items(
+        self,
+        view: WorkItemsViewConfiguration,
+        fields: list[str] | None = None,
+        max_results: int = 200,
+    ) -> APIControllerResponse:
+        """Searches the work items of a configured view.
+
+        A view with `related_to` first searches its base work items, then selects their sub-tasks and the work items
+        linked to them, narrowed by the view's JQL.
+
+        Args:
+            view: the view to search.
+            fields: the fields to retrieve for every work item.
+            max_results: the maximum number of work items to retrieve.
+
+        Returns:
+            An instance of `APIControllerResponse` whose result is a `JiraIssueSearchResponse` with every work item of
+            the view up to `max_results`; its `is_last` is `False` when the view holds more work items than that.
+        """
+
+        jql: str | None = build_view_jql(view.jql)
+        if view.related_to:
+            base: APIControllerResponse = await self._search_all_work_items(
+                view.related_to,
+                [*DEFAULT_WORK_ITEM_SEARCH_FIELDS, JiraWorkItemFields.ISSUE_LINKS.value],
+                max_results,
+            )
+            if not base.success:
+                return base
+            base_work_items: list[JiraIssue] = base.result.issues
+            jql = build_related_view_jql(
+                view.jql,
+                parent_keys=[work_item.key for work_item in base_work_items],
+                linked_keys=[
+                    related.key
+                    for work_item in base_work_items
+                    for related in work_item.related_issues or []
+                ],
+            )
+        if jql is None:
+            return APIControllerResponse(
+                result=JiraIssueSearchResponse(issues=[], is_last=True, total=0)
+            )
+        return await self._search_all_work_items(
+            jql, fields or DEFAULT_WORK_ITEM_SEARCH_FIELDS, max_results
+        )
+
+    async def _search_all_work_items(
+        self, jql: str, fields: list[str], max_results: int
+    ) -> APIControllerResponse:
+        """Searches every page of the work items a JQL expression selects, up to `max_results` work items."""
+
+        work_items: list[JiraIssue] = []
+        next_page_token: str | None = None
+        page = 1
+        exhausted = False
+        while len(work_items) < max_results:
+            response: APIControllerResponse
+            if self.config.cloud:
+                response = await self.search_issues(
+                    jql_query=jql,
+                    fields=fields,
+                    next_page_token=next_page_token,
+                    limit=VIEW_SEARCH_CLOUD_PAGE_SIZE,
+                )
+            else:
+                # the Data Center search computes offsets from the default page size whatever limit it is given
+                response = await self.search_issues_by_page_number(
+                    jql_query=jql,
+                    fields=fields,
+                    page=page,
+                    limit=ISSUE_SEARCH_DEFAULT_MAX_RESULTS,
+                )
+            if not response.success:
+                return response
+            results: JiraIssueSearchResponse = response.result
+            work_items.extend(results.issues)
+            if self.config.cloud:
+                next_page_token = results.next_page_token
+                exhausted = results.is_last is True or not next_page_token
+            else:
+                offset = results.offset or 0
+                exhausted = not results.issues or offset + len(results.issues) >= (
+                    results.total or 0
+                )
+                page += 1
+            if exhausted:
+                break
+        return APIControllerResponse(
+            result=JiraIssueSearchResponse(
+                issues=work_items[:max_results],
+                is_last=exhausted and len(work_items) <= max_results,
+                total=min(len(work_items), max_results),
             )
         )
 

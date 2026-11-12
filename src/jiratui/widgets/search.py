@@ -15,6 +15,7 @@ from textual.widgets._data_table import RowDoesNotExist
 from jiratui.actions.constants import SupportedActions
 from jiratui.actions.keys import get_application_key_bindings
 from jiratui.api_controller.controller import APIControllerResponse
+from jiratui.config import StatusSectionConfiguration
 from jiratui.models import JiraIssue, JiraIssueSearchResponse
 from jiratui.utils.search import (
     MAP_WORK_ITEM_SEARCH_FIELD_TO_SEARCH_RESULTS_COLUMNS,
@@ -25,6 +26,7 @@ from jiratui.utils.search import (
 from jiratui.utils.styling import get_style_for_work_item_status, get_style_for_work_item_type
 from jiratui.utils.ui_actions import Actionable, UIAction
 from jiratui.utils.urls import build_external_url_for_issue
+from jiratui.utils.views import group_work_items_by_status
 from jiratui.widgets.messages import SearchWorkItem
 from jiratui.widgets.screens.confirmation import ConfirmationScreen
 from jiratui.widgets.screens.goto import GoToScreen
@@ -110,11 +112,19 @@ class DataTableSearchInput(Input):
                 self.total = len(filtered)
 
 
+SECTION_ROW_KEY_PREFIX = 'section:'
+"""Prefixes the row key of every status section heading; work item rows use `<id>#<key>`."""
+
+
 class IssuesSearchResultsTable(Actionable, DataTable, inherit_bindings=False):  # type:ignore[call-arg]
     """The widget that displays the results of a work item search.
 
     This widget provides a reactive attribute, `search_results`, that contains the issues that the table will
     display.
+
+    When `config.status_sections` is set the rows are grouped into status sections, each under a heading row.
+    Selecting a heading collapses or expands its section. Work items keep their numbers whether or not their section
+    is collapsed.
 
     The widget can post a message of type [IssuesSearchResultsTable.WorkItemDeleted](#jiratui.widgets.search.IssuesSearchResultsTable.WorkItemDeleted)
     when the user deletes an item from the table.
@@ -216,6 +226,12 @@ class IssuesSearchResultsTable(Actionable, DataTable, inherit_bindings=False):  
         self.current_work_item_key: str | None = None
         self.current_work_item_id: str | None = None
         self._initial_results_set: JiraIssueSearchResponse | None = None
+        self._collapsed_by_user: dict[str, bool] = {}
+        """Collapsed state the user chose for each section label; it outlives searches until the app exits."""
+        self._rendered_sections: dict[str, tuple[str, bool]] = {}
+        """Label and collapsed state of each section heading on display, by row key."""
+        self._row_key_by_position: dict[int, str | None] = {}
+        """The row key of every numbered work item, by its number; `None` while its section is collapsed."""
 
     def set_initial_results_set(self, data: JiraIssueSearchResponse | None = None):
         self._initial_results_set = data
@@ -261,12 +277,98 @@ class IssuesSearchResultsTable(Actionable, DataTable, inherit_bindings=False):  
             self.app.config.search_results_columns  # type:ignore[attr-defined]
         )
 
+        self._rendered_sections = {}
+        self._row_key_by_position = {}
+        if sections := self.app.config.status_sections:  # type:ignore[attr-defined]
+            self._add_sectioned_rows(
+                response.issues,
+                sections,
+                work_item_search_fields,
+                maximum_summary_column_width,
+                len(columns),
+            )
+            return
+
         # build the rows
         for index, issue in enumerate(response.issues):
             cells = self._build_row_for_work_item(
                 issue, work_item_search_fields, maximum_summary_column_width
             )
             self.add_row(*[index + 1, *cells], key=f'{issue.id}#{issue.key}')
+            self._row_key_by_position[index + 1] = f'{issue.id}#{issue.key}'
+
+    def _add_sectioned_rows(
+        self,
+        work_items: list[JiraIssue],
+        sections: list[StatusSectionConfiguration],
+        work_item_search_fields: list[str],
+        maximum_summary_column_width: int,
+        column_count: int,
+    ) -> None:
+        """Adds a heading row for every non-empty status section, followed by its work items unless it is collapsed.
+
+        The heading shows the section's label and work item count in the first column after the number, colored like
+        the status of its first work item.
+        """
+
+        position = 0
+        for index, section in enumerate(group_work_items_by_status(work_items, sections)):
+            collapsed = self._collapsed_by_user.get(section.label, section.collapsed)
+            row_key = f'{SECTION_ROW_KEY_PREFIX}{index}'
+            self._rendered_sections[row_key] = (section.label, collapsed)
+            style = 'bold'
+            if self.app.config.search_results_style_work_item_status:  # type:ignore[attr-defined]
+                style = f'bold {get_style_for_work_item_status(section.work_items[0].status_name)}'
+            self.add_row(
+                Text('▶' if collapsed else '▼', style=style.strip()),
+                Text(f'{section.label} ({len(section.work_items)})', style=style.strip()),
+                *([''] * (column_count - 1)),
+                key=row_key,
+            )
+            for work_item in section.work_items:
+                position += 1
+                if collapsed:
+                    self._row_key_by_position[position] = None
+                    continue
+                cells = self._build_row_for_work_item(
+                    work_item, work_item_search_fields, maximum_summary_column_width
+                )
+                self.add_row(position, *cells, key=f'{work_item.id}#{work_item.key}')
+                self._row_key_by_position[position] = f'{work_item.id}#{work_item.key}'
+
+    def toggle_section(self, row_key: str) -> None:
+        """Collapses or expands the status section whose heading has `row_key`, keeping the cursor on the heading."""
+
+        if (rendered := self._rendered_sections.get(row_key)) is None:
+            return
+        label, collapsed = rendered
+        self._collapsed_by_user[label] = not collapsed
+        self.search_results = self.search_results
+        self.move_cursor(row=self.get_row_index(row_key))
+
+    def row_index_for_position(self, position: int) -> int | None:
+        """Returns the index of the row that shows the work item numbered `position`.
+
+        Args:
+            position: the number the table shows for a work item.
+
+        Returns:
+            The index of the row, or `None` when no work item has that number or its section is collapsed.
+        """
+
+        if (row_key := self._row_key_by_position.get(position)) is None:
+            return None
+        try:
+            return self.get_row_index(row_key)
+        except RowDoesNotExist:
+            # deleting a work item removes its row but keeps the numbers of the rest
+            return None
+
+    @property
+    def work_item_count(self) -> int:
+        """The number of work items in the table, counting those in collapsed sections but not section headings."""
+
+        return len(self._row_key_by_position)
 
     def _build_row_for_work_item(
         self, item: JiraIssue, work_item_search_fields: list[str], maximum_summary_column_width: int
@@ -302,8 +404,11 @@ class IssuesSearchResultsTable(Actionable, DataTable, inherit_bindings=False):  
         return [value for key, value in sorted(cells.items())]
 
     def on_data_table_row_selected(self, event: DataTable.RowSelected) -> None:
-        """Fetches the details of the currently-selected item."""
+        """Fetches the details of the currently-selected item, or toggles the section of a selected heading."""
         if event.row_key:
+            if event.row_key.value.startswith(SECTION_ROW_KEY_PREFIX):
+                self.toggle_section(event.row_key.value)
+                return
             screen = cast('MainScreen', self.screen)  # type:ignore[name-defined] # noqa: F821
             self.current_work_item_id, self.current_work_item_key = event.row_key.value.split('#')
             # use exclusive=True to make sure that if the user selects another work item before the worker finishes
@@ -312,8 +417,11 @@ class IssuesSearchResultsTable(Actionable, DataTable, inherit_bindings=False):  
             self.run_worker(screen.fetch_issue(self.current_work_item_key), exclusive=True)
 
     def on_data_table_row_highlighted(self, event: DataTable.RowHighlighted) -> None:
-        """Stores the key of the currently-selected item."""
+        """Stores the key of the currently-selected item; a section heading leaves no item selected."""
         if event.row_key:
+            if event.row_key.value.startswith(SECTION_ROW_KEY_PREFIX):
+                self.current_work_item_id = self.current_work_item_key = None
+                return
             self.current_work_item_id, self.current_work_item_key = event.row_key.value.split('#')
 
     async def action_view_work_item(self) -> None:
@@ -506,7 +614,8 @@ class SearchResultsContainer(Container):
 
     pagination: Reactive[dict | None] = reactive(None)
     """Reactive attribute that contains pagination details associated to the search results. This is used setting the
-    widget's border subtitle with the page number and total records in the result."""
+    widget's border subtitle with the page number and total records in the result. With `'paged': False`, for results
+    that arrive as one list, the subtitle shows only the total."""
 
     def __init__(self, *args, **kwargs):
         border_title = kwargs.pop('border_title', None)
@@ -515,8 +624,12 @@ class SearchResultsContainer(Container):
         self._total_results = None
         self._page_number = None
         self._total_pages: int | None = None
+        self._paged = True
 
     def _update_border_subtitle(self) -> None:
+        if not self._paged:
+            self.border_subtitle = f'Total: {self._total_results or 0}'
+            return
         if self._total_results is None:
             self.border_subtitle = (
                 None if self._page_number is None else f'Page {self._page_number}'
@@ -534,6 +647,7 @@ class SearchResultsContainer(Container):
         if response:
             self._page_number = max(1, response.get('current_page_number'))
             self._total_results = response.get('total', 0)
+            self._paged = response.get('paged', True)
             self._update_border_subtitle()
 
     @on(IssuesSearchResultsTable.WorkItemDeleted)

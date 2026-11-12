@@ -17,7 +17,6 @@ class SupportedActions(Enum):
     COPY_CONTENT = 'copy_content'
     COPY_ISSUE_KEY = 'copy_issue_key'
     COPY_ISSUE_URL = 'copy_issue_url'
-    CREATE_GIT_BRANCH = 'create_git_branch'
     CREATE_WORK_ITEM = 'create_work_item'
     CREATE_WORK_ITEM_SUBTASK = 'create_work_item_subtask'
     CURSOR_DOWN = 'cursor_down'
@@ -58,6 +57,7 @@ class SupportedActions(Enum):
     FOCUS_WORK_ITEM_SUBTASKS_TAB = 'focus_work_item_subtasks_tab'
     HELP = 'help'
     LINK_WORK_ITEM = 'link_work_item'
+    LOAD_VIEW = 'load_view'
     LOG_WORK = 'log_work'
     NEXT_ISSUES_PAGE = 'next_issues_page'
     NEXT_TAB = 'next_tab'
@@ -70,6 +70,7 @@ class SupportedActions(Enum):
     PAGE_DOWN = 'page_down'
     PAGE_UP = 'page_up'
     PREVIOUS_ISSUES_PAGE = 'previous_issues_page'
+    RELOAD_VIEW = 'reload_view'
     SAVE_CONTENT = 'save_content'
     SCROLL_BOTTOM = 'scroll_bottom'
     SCROLL_DOWN = 'scroll_down'
@@ -251,11 +252,17 @@ KEY_BINDINGS_LEGACY = {
         'description': '\u2398 URL',
         'tooltip': 'Copy the work item URL',
     },
-    SupportedActions.CREATE_GIT_BRANCH.value: {
-        'keys': ['ctrl+g'],
-        'show': True,
-        'description': 'Git',
-        'tooltip': 'Creates a Git branch for a work item',
+    SupportedActions.LOAD_VIEW.value: {
+        'keys': ['alt+1', 'alt+2', 'alt+3', 'alt+4', 'alt+5', 'alt+6', 'alt+7', 'alt+8', 'alt+9'],
+        'show': False,
+        'description': 'View',
+        'tooltip': 'Loads the configured view in that position: alt+1 the first, alt+2 the second',
+    },
+    SupportedActions.RELOAD_VIEW.value: {
+        'keys': ['alt+r'],
+        'show': False,
+        'description': 'Reload View',
+        'tooltip': 'Loads the active view again',
     },
     # search results bindings - begin
     SupportedActions.FILTER.value: {
@@ -733,12 +740,18 @@ KEY_BINDINGS_STANDARD = {
         'description': 'Copy Content',
         'tooltip': 'Copy the text content of a resource',
     },
-    # Git
-    SupportedActions.CREATE_GIT_BRANCH.value: {
-        'keys': ['f6'],
-        'show': True,
-        'description': 'Git',
-        'tooltip': 'Creates a Git branch for a work item',
+    # Views
+    SupportedActions.LOAD_VIEW.value: {
+        'keys': ['alt+1', 'alt+2', 'alt+3', 'alt+4', 'alt+5', 'alt+6', 'alt+7', 'alt+8', 'alt+9'],
+        'show': False,
+        'description': 'View',
+        'tooltip': 'Loads the configured view in that position: alt+1 the first, alt+2 the second',
+    },
+    SupportedActions.RELOAD_VIEW.value: {
+        'keys': ['alt+r'],
+        'show': False,
+        'description': 'Reload View',
+        'tooltip': 'Loads the active view again',
     },
     # Search Results Actions
     SupportedActions.FILTER.value: {

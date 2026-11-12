@@ -20,6 +20,7 @@ from textual.widgets import DataTable
 from jiratui.actions.constants import SupportedActions
 from jiratui.actions.keys import get_application_key_bindings
 from jiratui.api_controller.controller import APIController, APIControllerResponse
+from jiratui.config import WorkItemsViewConfiguration
 from jiratui.models import (
     Attachment,
     IssueComment,
@@ -68,7 +69,6 @@ from jiratui.widgets.screen import MainScreen, WorkItemSearchResult
 from jiratui.widgets.screens.config import ConfigFileScreen, ConfigTable
 from jiratui.widgets.screens.confirmation import ConfirmationScreen
 from jiratui.widgets.screens.context_menu import ContextMenuOptionList
-from jiratui.widgets.screens.git import GitScreen
 from jiratui.widgets.screens.goto import GoToScreen
 from jiratui.widgets.screens.help import HelpScreen
 from jiratui.widgets.screens.history import HistoryScreen
@@ -326,40 +326,81 @@ async def test_key_to_perform_full_text_search_from_main_screen(
         action_find_by_text_mock.assert_awaited_once()
 
 
-@patch('jiratui.widgets.screen.MainScreen._search_work_items')
+@patch('jiratui.widgets.screen.MainScreen.load_view')
 @patch('jiratui.widgets.screen.MainScreen.fetch_statuses')
 @patch('jiratui.widgets.screen.MainScreen.fetch_issue_types')
 @patch('jiratui.widgets.screen.MainScreen.fetch_projects')
 @pytest.mark.asyncio
-async def test_key_to_open_git_screen(
+async def test_key_to_load_the_first_view(
     search_projects_mock,
     fetch_issue_types_mock,
     fetch_statuses_mock,
-    search_work_items_mock: AsyncMock,
-    jira_issues,
+    load_view_mock: AsyncMock,
     bindings: dict,
     app,
 ):
     # GIVEN
-    app.config.search_results_truncate_work_item_summary = 10
-    app.config.search_results_style_work_item_status = False
-    app.config.search_results_style_work_item_type = False
-    app.config.search_results_per_page = 10
-    app.config.git_repositories = None
-    search_work_items_mock.return_value = WorkItemSearchResult(
-        response=JiraIssueSearchResponse(issues=jira_issues),
-        total=1,
-        start=1,
-        end=1,
-    )
-    app.config.pre_defined_jql_expressions = None
+    app.config.views = [
+        WorkItemsViewConfiguration(label='Mine', jql='assignee = currentUser()'),
+        WorkItemsViewConfiguration(label='Bugs', jql='issuetype = Bug'),
+    ]
     async with app.run_test() as pilot:
-        await pilot.press(bindings.get('search', {}).get('keys', [])[0])
+        # WHEN
+        await pilot.press(bindings.get('load_view', {}).get('keys', [])[0])
         await app.workers.wait_for_complete()
-        await pilot.press(bindings.get('create_git_branch', {}).get('keys', [])[0])
         # THEN
-        search_work_items_mock.assert_awaited_once()
-        assert isinstance(app.screen, GitScreen)
+        load_view_mock.assert_awaited_once_with(1)
+
+
+@patch('jiratui.widgets.screen.MainScreen.load_view')
+@patch('jiratui.widgets.screen.MainScreen.fetch_statuses')
+@patch('jiratui.widgets.screen.MainScreen.fetch_issue_types')
+@patch('jiratui.widgets.screen.MainScreen.fetch_projects')
+@pytest.mark.asyncio
+async def test_key_for_a_view_past_the_configured_views_loads_nothing(
+    search_projects_mock,
+    fetch_issue_types_mock,
+    fetch_statuses_mock,
+    load_view_mock: AsyncMock,
+    bindings: dict,
+    app,
+):
+    # GIVEN
+    app.config.views = [WorkItemsViewConfiguration(label='Mine', jql='assignee = currentUser()')]
+    async with app.run_test() as pilot:
+        # WHEN
+        await pilot.press(bindings.get('load_view', {}).get('keys', [])[1])
+        await app.workers.wait_for_complete()
+        # THEN
+        load_view_mock.assert_not_awaited()
+
+
+@patch('jiratui.widgets.screen.MainScreen.load_view')
+@patch('jiratui.widgets.screen.MainScreen.fetch_statuses')
+@patch('jiratui.widgets.screen.MainScreen.fetch_issue_types')
+@patch('jiratui.widgets.screen.MainScreen.fetch_projects')
+@pytest.mark.asyncio
+async def test_key_to_reload_the_active_view(
+    search_projects_mock,
+    fetch_issue_types_mock,
+    fetch_statuses_mock,
+    load_view_mock: AsyncMock,
+    bindings: dict,
+    app,
+):
+    # GIVEN
+    app.config.views = [
+        WorkItemsViewConfiguration(label='Mine', jql='assignee = currentUser()'),
+        WorkItemsViewConfiguration(label='Bugs', jql='issuetype = Bug'),
+    ]
+    async with app.run_test() as pilot:
+        main_screen = cast('MainScreen', app.screen)  # type:ignore[name-defined] # noqa: F821
+        main_screen.active_view = 2
+        # WHEN
+        await pilot.press(bindings.get('reload_view', {}).get('keys', [])[0])
+        await app.workers.wait_for_complete()
+        # THEN
+        load_view_mock.assert_awaited_once_with(2)
 
 
 @patch('jiratui.widgets.screen.MainScreen._search_work_items')
@@ -381,7 +422,6 @@ async def test_key_to_open_goto_screen(
     app.config.search_results_style_work_item_status = False
     app.config.search_results_style_work_item_type = False
     app.config.search_results_per_page = 10
-    app.config.git_repositories = None
     app.config.jira_base_url = 'foo.bar'
     app.config.enable_goto = True
     search_work_items_mock.return_value = WorkItemSearchResult(
@@ -434,7 +474,6 @@ async def test_action_view_work_item_to_view_related_item(
     app.config.search_results_style_work_item_status = False
     app.config.search_results_style_work_item_type = False
     app.config.search_results_per_page = 10
-    app.config.git_repositories = None
     app.config.jira_base_url = 'foo.bar'
     app.config.enable_goto = True
     search_work_items_mock.return_value = WorkItemSearchResult(
@@ -487,7 +526,6 @@ async def test_acton_unlink_work_item_to_delete_related_item(
     app.config.search_results_style_work_item_status = False
     app.config.search_results_style_work_item_type = False
     app.config.search_results_per_page = 10
-    app.config.git_repositories = None
     app.config.jira_base_url = 'foo.bar'
     app.config.enable_goto = True
     search_work_items_mock.return_value = WorkItemSearchResult(
@@ -540,7 +578,6 @@ async def test_action_link_work_item_to_add_related_item(
     app.config.search_results_style_work_item_status = False
     app.config.search_results_style_work_item_type = False
     app.config.search_results_per_page = 10
-    app.config.git_repositories = None
     app.config.jira_base_url = 'foo.bar'
     app.config.enable_goto = True
     search_work_items_mock.return_value = WorkItemSearchResult(
@@ -595,7 +632,6 @@ async def test_action_copy_issue_url_from_main_screen(
     app.config.search_results_style_work_item_status = False
     app.config.search_results_style_work_item_type = False
     app.config.search_results_per_page = 10
-    app.config.git_repositories = None
     app.config.jira_base_url = 'foo.bar'
     search_work_items_mock.return_value = WorkItemSearchResult(
         response=JiraIssueSearchResponse(issues=jira_issues),
@@ -634,7 +670,6 @@ async def test_action_copy_issue_key_from_main_screen(
     app.config.search_results_style_work_item_status = False
     app.config.search_results_style_work_item_type = False
     app.config.search_results_per_page = 10
-    app.config.git_repositories = None
     app.config.jira_base_url = 'foo.bar'
     search_work_items_mock.return_value = WorkItemSearchResult(
         response=JiraIssueSearchResponse(issues=jira_issues),
@@ -710,7 +745,6 @@ async def test_action_open_in_browser_from_search_results(
     app.config.search_results_style_work_item_status = False
     app.config.search_results_style_work_item_type = False
     app.config.search_results_per_page = 10
-    app.config.git_repositories = None
     app.config.jira_base_url = 'foo.bar'
     search_work_items_mock.return_value = WorkItemSearchResult(
         response=JiraIssueSearchResponse(issues=jira_issues),
@@ -749,7 +783,6 @@ async def test_action_next_issues_page_from_search_results(
     app.config.search_results_style_work_item_status = False
     app.config.search_results_style_work_item_type = False
     app.config.search_results_per_page = 10
-    app.config.git_repositories = None
     app.config.jira_base_url = 'foo.bar'
     search_work_items_mock.return_value = WorkItemSearchResult(
         response=JiraIssueSearchResponse(issues=jira_issues),
@@ -789,7 +822,6 @@ async def test_action_previous_issues_page_from_search_results(
     app.config.search_results_style_work_item_status = False
     app.config.search_results_style_work_item_type = False
     app.config.search_results_per_page = 10
-    app.config.git_repositories = None
     app.config.jira_base_url = 'foo.bar'
     search_work_items_mock.return_value = WorkItemSearchResult(
         response=JiraIssueSearchResponse(issues=jira_issues),
@@ -829,7 +861,6 @@ async def test_action_filter_results_from_search_results(
     app.config.search_results_style_work_item_status = False
     app.config.search_results_style_work_item_type = False
     app.config.search_results_per_page = 10
-    app.config.git_repositories = None
     app.config.jira_base_url = 'foo.bar'
     search_work_items_mock.return_value = WorkItemSearchResult(
         response=JiraIssueSearchResponse(issues=jira_issues),
@@ -870,7 +901,6 @@ async def test_action_select_cursor_to_select_item_from_search_results(
     app.config.search_results_style_work_item_status = False
     app.config.search_results_style_work_item_type = False
     app.config.search_results_per_page = 10
-    app.config.git_repositories = None
     app.config.jira_base_url = 'foo.bar'
     search_work_items_mock.return_value = WorkItemSearchResult(
         response=JiraIssueSearchResponse(issues=jira_issues),
@@ -917,7 +947,6 @@ async def test_action_cursor_up_in_search_results(
     app.config.search_results_style_work_item_status = False
     app.config.search_results_style_work_item_type = False
     app.config.search_results_per_page = 10
-    app.config.git_repositories = None
     app.config.jira_base_url = 'foo.bar'
     search_work_items_mock.return_value = WorkItemSearchResult(
         response=JiraIssueSearchResponse(issues=jira_issues),
@@ -965,7 +994,6 @@ async def test_action_cursor_down_in_search_results(
     app.config.search_results_style_work_item_status = False
     app.config.search_results_style_work_item_type = False
     app.config.search_results_per_page = 10
-    app.config.git_repositories = None
     app.config.jira_base_url = 'foo.bar'
     search_work_items_mock.return_value = WorkItemSearchResult(
         response=JiraIssueSearchResponse(issues=jira_issues),
@@ -1013,7 +1041,6 @@ async def test_action_page_up_in_search_results(
     app.config.search_results_style_work_item_status = False
     app.config.search_results_style_work_item_type = False
     app.config.search_results_per_page = 10
-    app.config.git_repositories = None
     app.config.jira_base_url = 'foo.bar'
     search_work_items_mock.return_value = WorkItemSearchResult(
         response=JiraIssueSearchResponse(issues=jira_issues),
@@ -1053,7 +1080,6 @@ async def test_action_page_down_in_search_results(
     app.config.search_results_style_work_item_status = False
     app.config.search_results_style_work_item_type = False
     app.config.search_results_per_page = 10
-    app.config.git_repositories = None
     app.config.jira_base_url = 'foo.bar'
     search_work_items_mock.return_value = WorkItemSearchResult(
         response=JiraIssueSearchResponse(issues=jira_issues),
@@ -1093,7 +1119,6 @@ async def test_action_scroll_top_in_search_results(
     app.config.search_results_style_work_item_status = False
     app.config.search_results_style_work_item_type = False
     app.config.search_results_per_page = 10
-    app.config.git_repositories = None
     app.config.jira_base_url = 'foo.bar'
     search_work_items_mock.return_value = WorkItemSearchResult(
         response=JiraIssueSearchResponse(issues=jira_issues),
@@ -1133,7 +1158,6 @@ async def test_action_scroll_bottom_in_search_results(
     app.config.search_results_style_work_item_status = False
     app.config.search_results_style_work_item_type = False
     app.config.search_results_per_page = 10
-    app.config.git_repositories = None
     app.config.jira_base_url = 'foo.bar'
     search_work_items_mock.return_value = WorkItemSearchResult(
         response=JiraIssueSearchResponse(issues=jira_issues),
@@ -1176,7 +1200,6 @@ async def test_key_to_move_cursor_right_in_search_results(
     app.config.search_results_style_work_item_status = False
     app.config.search_results_style_work_item_type = False
     app.config.search_results_per_page = 10
-    app.config.git_repositories = None
     app.config.jira_base_url = 'foo.bar'
     search_work_items_mock.return_value = WorkItemSearchResult(
         response=JiraIssueSearchResponse(issues=jira_issues),
@@ -1219,7 +1242,6 @@ async def test_key_to_move_cursor_left_in_search_results(
     app.config.search_results_style_work_item_status = False
     app.config.search_results_style_work_item_type = False
     app.config.search_results_per_page = 10
-    app.config.git_repositories = None
     app.config.jira_base_url = 'foo.bar'
     search_work_items_mock.return_value = WorkItemSearchResult(
         response=JiraIssueSearchResponse(issues=jira_issues),
@@ -1335,7 +1357,6 @@ async def test_action_add_comment(
     app.config.search_results_style_work_item_status = False
     app.config.search_results_style_work_item_type = False
     app.config.search_results_per_page = 10
-    app.config.git_repositories = None
     app.config.jira_base_url = 'foo.bar'
     app.config.enable_goto = True
     search_work_items_mock.return_value = WorkItemSearchResult(
@@ -1391,7 +1412,6 @@ async def test_action_page_up_in_comments_tab(
     app.config.search_results_style_work_item_status = False
     app.config.search_results_style_work_item_type = False
     app.config.search_results_per_page = 10
-    app.config.git_repositories = None
     app.config.jira_base_url = 'foo.bar'
     app.config.enable_goto = True
     search_work_items_mock.return_value = WorkItemSearchResult(
@@ -1447,7 +1467,6 @@ async def test_action_page_down_in_comments_tab(
     app.config.search_results_style_work_item_status = False
     app.config.search_results_style_work_item_type = False
     app.config.search_results_per_page = 10
-    app.config.git_repositories = None
     app.config.jira_base_url = 'foo.bar'
     app.config.enable_goto = True
     search_work_items_mock.return_value = WorkItemSearchResult(
@@ -1503,7 +1522,6 @@ async def test_action_scroll_home_in_comments_tab(
     app.config.search_results_style_work_item_status = False
     app.config.search_results_style_work_item_type = False
     app.config.search_results_per_page = 10
-    app.config.git_repositories = None
     app.config.jira_base_url = 'foo.bar'
     app.config.enable_goto = True
     search_work_items_mock.return_value = WorkItemSearchResult(
@@ -1559,7 +1577,6 @@ async def test_action_scroll_end_in_comments_tab(
     app.config.search_results_style_work_item_status = False
     app.config.search_results_style_work_item_type = False
     app.config.search_results_per_page = 10
-    app.config.git_repositories = None
     app.config.jira_base_url = 'foo.bar'
     app.config.enable_goto = True
     search_work_items_mock.return_value = WorkItemSearchResult(
@@ -1615,7 +1632,6 @@ async def test_action_scroll_up_in_comments_tab(
     app.config.search_results_style_work_item_status = False
     app.config.search_results_style_work_item_type = False
     app.config.search_results_per_page = 10
-    app.config.git_repositories = None
     app.config.jira_base_url = 'foo.bar'
     app.config.enable_goto = True
     search_work_items_mock.return_value = WorkItemSearchResult(
@@ -1672,7 +1688,6 @@ async def test_action_scroll_down_in_comments_tab(
     app.config.search_results_style_work_item_status = False
     app.config.search_results_style_work_item_type = False
     app.config.search_results_per_page = 10
-    app.config.git_repositories = None
     app.config.jira_base_url = 'foo.bar'
     app.config.enable_goto = True
     search_work_items_mock.return_value = WorkItemSearchResult(
@@ -1729,7 +1744,6 @@ async def test_action_delete_comment(
     app.config.search_results_style_work_item_status = False
     app.config.search_results_style_work_item_type = False
     app.config.search_results_per_page = 10
-    app.config.git_repositories = None
     app.config.jira_base_url = 'foo.bar'
     app.config.enable_goto = True
     search_work_items_mock.return_value = WorkItemSearchResult(
@@ -1785,7 +1799,6 @@ async def test_action_edit_comment(
     app.config.search_results_style_work_item_status = False
     app.config.search_results_style_work_item_type = False
     app.config.search_results_per_page = 10
-    app.config.git_repositories = None
     app.config.jira_base_url = 'foo.bar'
     app.config.enable_goto = True
     search_work_items_mock.return_value = WorkItemSearchResult(
@@ -1841,7 +1854,6 @@ async def test_action_add_attachment(
     app.config.search_results_style_work_item_status = False
     app.config.search_results_style_work_item_type = False
     app.config.search_results_per_page = 10
-    app.config.git_repositories = None
     app.config.jira_base_url = 'foo.bar'
     app.config.enable_goto = True
     search_work_items_mock.return_value = WorkItemSearchResult(
@@ -1895,7 +1907,6 @@ async def test_action_delete_attachment(
     app.config.search_results_style_work_item_status = False
     app.config.search_results_style_work_item_type = False
     app.config.search_results_per_page = 10
-    app.config.git_repositories = None
     app.config.jira_base_url = 'foo.bar'
     app.config.enable_goto = True
     search_work_items_mock.return_value = WorkItemSearchResult(
@@ -1949,7 +1960,6 @@ async def test_action_open_attachment(
     app.config.search_results_style_work_item_status = False
     app.config.search_results_style_work_item_type = False
     app.config.search_results_per_page = 10
-    app.config.git_repositories = None
     app.config.jira_base_url = 'foo.bar'
     app.config.enable_goto = True
     search_work_items_mock.return_value = WorkItemSearchResult(
@@ -2003,7 +2013,6 @@ async def test_action_page_up_in_attachments_table(
     app.config.search_results_style_work_item_status = False
     app.config.search_results_style_work_item_type = False
     app.config.search_results_per_page = 10
-    app.config.git_repositories = None
     app.config.jira_base_url = 'foo.bar'
     app.config.enable_goto = True
     search_work_items_mock.return_value = WorkItemSearchResult(
@@ -2071,7 +2080,6 @@ async def test_action_page_down_in_attachments_table(
     app.config.search_results_style_work_item_status = False
     app.config.search_results_style_work_item_type = False
     app.config.search_results_per_page = 10
-    app.config.git_repositories = None
     app.config.jira_base_url = 'foo.bar'
     app.config.enable_goto = True
     search_work_items_mock.return_value = WorkItemSearchResult(
@@ -2139,7 +2147,6 @@ async def test_action_cursor_up_in_attachments_table(
     app.config.search_results_style_work_item_status = False
     app.config.search_results_style_work_item_type = False
     app.config.search_results_per_page = 10
-    app.config.git_repositories = None
     app.config.jira_base_url = 'foo.bar'
     app.config.enable_goto = True
     search_work_items_mock.return_value = WorkItemSearchResult(
@@ -2208,7 +2215,6 @@ async def test_action_cursor_down_in_attachments_table(
     app.config.search_results_style_work_item_status = False
     app.config.search_results_style_work_item_type = False
     app.config.search_results_per_page = 10
-    app.config.git_repositories = None
     app.config.jira_base_url = 'foo.bar'
     app.config.enable_goto = True
     search_work_items_mock.return_value = WorkItemSearchResult(
@@ -2277,7 +2283,6 @@ async def test_action_scroll_top_in_attachments_table(
     app.config.search_results_style_work_item_status = False
     app.config.search_results_style_work_item_type = False
     app.config.search_results_per_page = 10
-    app.config.git_repositories = None
     app.config.jira_base_url = 'foo.bar'
     app.config.enable_goto = True
     search_work_items_mock.return_value = WorkItemSearchResult(
@@ -2345,7 +2350,6 @@ async def test_action_scroll_bottom_in_attachments_table(
     app.config.search_results_style_work_item_status = False
     app.config.search_results_style_work_item_type = False
     app.config.search_results_per_page = 10
-    app.config.git_repositories = None
     app.config.jira_base_url = 'foo.bar'
     app.config.enable_goto = True
     search_work_items_mock.return_value = WorkItemSearchResult(
@@ -2413,7 +2417,6 @@ async def test_action_link_work_item_from_related_issues_tab(
     app.config.search_results_style_work_item_status = False
     app.config.search_results_style_work_item_type = False
     app.config.search_results_per_page = 10
-    app.config.git_repositories = None
     app.config.jira_base_url = 'foo.bar'
     app.config.enable_goto = True
     search_work_items_mock.return_value = WorkItemSearchResult(
@@ -2467,7 +2470,6 @@ async def test_action_view_work_item_from_related_issues_tab(
     app.config.search_results_style_work_item_status = False
     app.config.search_results_style_work_item_type = False
     app.config.search_results_per_page = 10
-    app.config.git_repositories = None
     app.config.jira_base_url = 'foo.bar'
     app.config.enable_goto = True
     search_work_items_mock.return_value = WorkItemSearchResult(
@@ -2521,7 +2523,6 @@ async def test_action_unlink_work_item_from_related_issues_tab(
     app.config.search_results_style_work_item_status = False
     app.config.search_results_style_work_item_type = False
     app.config.search_results_per_page = 10
-    app.config.git_repositories = None
     app.config.jira_base_url = 'foo.bar'
     app.config.enable_goto = True
     search_work_items_mock.return_value = WorkItemSearchResult(
@@ -2575,7 +2576,6 @@ async def test_action_page_up_in_related_issues_tab(
     app.config.search_results_style_work_item_status = False
     app.config.search_results_style_work_item_type = False
     app.config.search_results_per_page = 10
-    app.config.git_repositories = None
     app.config.jira_base_url = 'foo.bar'
     app.config.enable_goto = True
     search_work_items_mock.return_value = WorkItemSearchResult(
@@ -2629,7 +2629,6 @@ async def test_action_page_down_in_related_issues_tab(
     app.config.search_results_style_work_item_status = False
     app.config.search_results_style_work_item_type = False
     app.config.search_results_per_page = 10
-    app.config.git_repositories = None
     app.config.jira_base_url = 'foo.bar'
     app.config.enable_goto = True
     search_work_items_mock.return_value = WorkItemSearchResult(
@@ -2683,7 +2682,6 @@ async def test_action_scroll_home_in_related_issues_tab(
     app.config.search_results_style_work_item_status = False
     app.config.search_results_style_work_item_type = False
     app.config.search_results_per_page = 10
-    app.config.git_repositories = None
     app.config.jira_base_url = 'foo.bar'
     app.config.enable_goto = True
     search_work_items_mock.return_value = WorkItemSearchResult(
@@ -2737,7 +2735,6 @@ async def test_action_scroll_end_in_related_issues_tab(
     app.config.search_results_style_work_item_status = False
     app.config.search_results_style_work_item_type = False
     app.config.search_results_per_page = 10
-    app.config.git_repositories = None
     app.config.jira_base_url = 'foo.bar'
     app.config.enable_goto = True
     search_work_items_mock.return_value = WorkItemSearchResult(
@@ -2791,7 +2788,6 @@ async def test_action_scroll_up_in_related_issues_tab(
     app.config.search_results_style_work_item_status = False
     app.config.search_results_style_work_item_type = False
     app.config.search_results_per_page = 10
-    app.config.git_repositories = None
     app.config.jira_base_url = 'foo.bar'
     app.config.enable_goto = True
     search_work_items_mock.return_value = WorkItemSearchResult(
@@ -2845,7 +2841,6 @@ async def test_action_scroll_down_in_related_issues_tab(
     app.config.search_results_style_work_item_status = False
     app.config.search_results_style_work_item_type = False
     app.config.search_results_per_page = 10
-    app.config.git_repositories = None
     app.config.jira_base_url = 'foo.bar'
     app.config.enable_goto = True
     search_work_items_mock.return_value = WorkItemSearchResult(
@@ -2901,7 +2896,6 @@ async def test_action_add_remote_link_from_links_tab(
     app.config.search_results_style_work_item_status = False
     app.config.search_results_style_work_item_type = False
     app.config.search_results_per_page = 10
-    app.config.git_repositories = None
     app.config.jira_base_url = 'foo.bar'
     app.config.enable_goto = True
     search_work_items_mock.return_value = WorkItemSearchResult(
@@ -2961,7 +2955,6 @@ async def test_action_page_up_from_remote_links_tab(
     app.config.search_results_style_work_item_status = False
     app.config.search_results_style_work_item_type = False
     app.config.search_results_per_page = 10
-    app.config.git_repositories = None
     app.config.jira_base_url = 'foo.bar'
     app.config.enable_goto = True
     search_work_items_mock.return_value = WorkItemSearchResult(
@@ -3022,7 +3015,6 @@ async def test_action_page_down_from_remote_links_tab(
     app.config.search_results_style_work_item_status = False
     app.config.search_results_style_work_item_type = False
     app.config.search_results_per_page = 10
-    app.config.git_repositories = None
     app.config.jira_base_url = 'foo.bar'
     app.config.enable_goto = True
     search_work_items_mock.return_value = WorkItemSearchResult(
@@ -3083,7 +3075,6 @@ async def test_action_scroll_home_from_remote_links_tab(
     app.config.search_results_style_work_item_status = False
     app.config.search_results_style_work_item_type = False
     app.config.search_results_per_page = 10
-    app.config.git_repositories = None
     app.config.jira_base_url = 'foo.bar'
     app.config.enable_goto = True
     search_work_items_mock.return_value = WorkItemSearchResult(
@@ -3143,7 +3134,6 @@ async def test_action_scroll_end_from_remote_links_tab(
     app.config.search_results_style_work_item_status = False
     app.config.search_results_style_work_item_type = False
     app.config.search_results_per_page = 10
-    app.config.git_repositories = None
     app.config.jira_base_url = 'foo.bar'
     app.config.enable_goto = True
     search_work_items_mock.return_value = WorkItemSearchResult(
@@ -3203,7 +3193,6 @@ async def test_action_scroll_up_from_remote_links_tab(
     app.config.search_results_style_work_item_status = False
     app.config.search_results_style_work_item_type = False
     app.config.search_results_per_page = 10
-    app.config.git_repositories = None
     app.config.jira_base_url = 'foo.bar'
     app.config.enable_goto = True
     search_work_items_mock.return_value = WorkItemSearchResult(
@@ -3264,7 +3253,6 @@ async def test_action_scroll_down_from_remote_links_tab(
     app.config.search_results_style_work_item_status = False
     app.config.search_results_style_work_item_type = False
     app.config.search_results_per_page = 10
-    app.config.git_repositories = None
     app.config.jira_base_url = 'foo.bar'
     app.config.enable_goto = True
     search_work_items_mock.return_value = WorkItemSearchResult(
@@ -3325,7 +3313,6 @@ async def test_action_delete_remote_link_from_links_tab(
     app.config.search_results_style_work_item_status = False
     app.config.search_results_style_work_item_type = False
     app.config.search_results_per_page = 10
-    app.config.git_repositories = None
     app.config.jira_base_url = 'foo.bar'
     app.config.enable_goto = True
     search_work_items_mock.return_value = WorkItemSearchResult(
@@ -3383,7 +3370,6 @@ async def test_action_view_worklog_from_details_tab(
     app.config.search_results_style_work_item_status = False
     app.config.search_results_style_work_item_type = False
     app.config.search_results_per_page = 10
-    app.config.git_repositories = None
     app.config.jira_base_url = 'foo.bar'
     app.config.enable_goto = True
     search_work_items_mock.return_value = WorkItemSearchResult(
@@ -3425,7 +3411,6 @@ async def test_action_log_work_from_details_tab(
     app.config.search_results_style_work_item_status = False
     app.config.search_results_style_work_item_type = False
     app.config.search_results_per_page = 10
-    app.config.git_repositories = None
     app.config.jira_base_url = 'foo.bar'
     app.config.enable_goto = True
     search_work_items_mock.return_value = WorkItemSearchResult(
@@ -3472,7 +3457,6 @@ async def test_action_delete_worklog_entry(
     app.config.search_results_style_work_item_status = False
     app.config.search_results_style_work_item_type = False
     app.config.search_results_per_page = 10
-    app.config.git_repositories = None
     app.config.jira_base_url = 'foo.bar'
     app.config.enable_goto = True
     search_work_items_mock.return_value = WorkItemSearchResult(
@@ -3523,7 +3507,6 @@ async def test_action_open_in_browser_worklog_entry(
     app.config.search_results_style_work_item_status = False
     app.config.search_results_style_work_item_type = False
     app.config.search_results_per_page = 10
-    app.config.git_repositories = None
     app.config.jira_base_url = 'foo.bar'
     app.config.enable_goto = True
     search_work_items_mock.return_value = WorkItemSearchResult(
@@ -3574,7 +3557,6 @@ async def test_action_edit_worklog_entry(
     app.config.search_results_style_work_item_status = False
     app.config.search_results_style_work_item_type = False
     app.config.search_results_per_page = 10
-    app.config.git_repositories = None
     app.config.jira_base_url = 'foo.bar'
     app.config.enable_goto = True
     search_work_items_mock.return_value = WorkItemSearchResult(
@@ -3622,7 +3604,6 @@ async def test_action_flag_work_item_from_details_tab(
     app.config.search_results_style_work_item_status = False
     app.config.search_results_style_work_item_type = False
     app.config.search_results_per_page = 10
-    app.config.git_repositories = None
     app.config.jira_base_url = 'foo.bar'
     app.config.enable_goto = True
     search_work_items_mock.return_value = WorkItemSearchResult(
@@ -3664,7 +3645,6 @@ async def test_action_save_work_item_from_details_tab(
     app.config.search_results_style_work_item_status = False
     app.config.search_results_style_work_item_type = False
     app.config.search_results_per_page = 10
-    app.config.git_repositories = None
     app.config.jira_base_url = 'foo.bar'
     app.config.enable_goto = True
     search_work_items_mock.return_value = WorkItemSearchResult(
@@ -3706,7 +3686,6 @@ async def test_action_view_content_from_info_tab(
     app.config.search_results_style_work_item_status = False
     app.config.search_results_style_work_item_type = False
     app.config.search_results_per_page = 10
-    app.config.git_repositories = None
     app.config.jira_base_url = 'foo.bar'
     app.config.enable_goto = True
     search_work_items_mock.return_value = WorkItemSearchResult(
@@ -3762,7 +3741,6 @@ async def test_action_edit_content_from_info_tab(
     app.config.search_results_style_work_item_status = False
     app.config.search_results_style_work_item_type = False
     app.config.search_results_per_page = 10
-    app.config.git_repositories = None
     app.config.jira_base_url = 'foo.bar'
     app.config.enable_goto = True
     search_work_items_mock.return_value = WorkItemSearchResult(
@@ -3816,7 +3794,6 @@ async def test_action_edit_content_open_edit_screen_from_info_tab_without_adf_su
     app.config.search_results_style_work_item_status = False
     app.config.search_results_style_work_item_type = False
     app.config.search_results_per_page = 10
-    app.config.git_repositories = None
     app.config.jira_base_url = 'foo.bar'
     app.config.enable_goto = True
     app.config.enable_updating_rich_text = True
@@ -3869,7 +3846,6 @@ async def test_action_edit_content_open_edit_screen_from_info_tab_with_adf_suppo
     app.config.search_results_style_work_item_status = False
     app.config.search_results_style_work_item_type = False
     app.config.search_results_per_page = 10
-    app.config.git_repositories = None
     app.config.jira_base_url = 'foo.bar'
     app.config.enable_goto = True
     app.config.enable_updating_rich_text = True
@@ -3928,7 +3904,6 @@ async def test_action_save_content_in_edit_screen_from_info_tab(
     app.config.search_results_style_work_item_status = False
     app.config.search_results_style_work_item_type = False
     app.config.search_results_per_page = 10
-    app.config.git_repositories = None
     app.config.jira_base_url = 'foo.bar'
     app.config.enable_goto = True
     app.config.enable_updating_rich_text = True
@@ -3988,7 +3963,6 @@ async def test_action_save_content_in_edit_screen_from_info_tab_with_no_adf_supp
     app.config.search_results_style_work_item_status = False
     app.config.search_results_style_work_item_type = False
     app.config.search_results_per_page = 10
-    app.config.git_repositories = None
     app.config.jira_base_url = 'foo.bar'
     app.config.enable_goto = True
     app.config.enable_updating_rich_text = True
@@ -4044,7 +4018,6 @@ async def test_action_copy_content_from_info_tab(
     app.config.search_results_style_work_item_status = False
     app.config.search_results_style_work_item_type = False
     app.config.search_results_per_page = 10
-    app.config.git_repositories = None
     app.config.jira_base_url = 'foo.bar'
     app.config.enable_goto = True
     search_work_items_mock.return_value = WorkItemSearchResult(
@@ -4168,7 +4141,6 @@ async def test_action_create_work_item_subtask_from_subtasks_tab(
     app.config.search_results_style_work_item_status = False
     app.config.search_results_style_work_item_type = False
     app.config.search_results_per_page = 10
-    app.config.git_repositories = None
     app.config.jira_base_url = 'foo.bar'
     search_work_items_mock.return_value = WorkItemSearchResult(
         response=JiraIssueSearchResponse(issues=jira_issues),
@@ -4208,7 +4180,6 @@ async def test_action_view_work_item_from_selected_subtasks_in_subtasks_tab(
     app.config.search_results_style_work_item_status = False
     app.config.search_results_style_work_item_type = False
     app.config.search_results_per_page = 10
-    app.config.git_repositories = None
     app.config.jira_base_url = 'foo.bar'
     app.config.enable_goto = True
     search_work_items_mock.return_value = WorkItemSearchResult(
@@ -4256,7 +4227,6 @@ async def test_action_open_go_to_screen_with_selected_subtask_from_subtasks_tab(
     app.config.search_results_style_work_item_status = False
     app.config.search_results_style_work_item_type = False
     app.config.search_results_per_page = 10
-    app.config.git_repositories = None
     app.config.jira_base_url = 'foo.bar'
     app.config.enable_goto = True
     search_work_items_mock.return_value = WorkItemSearchResult(
@@ -4304,7 +4274,6 @@ async def test_action_delete_work_item_with_selected_subtask_from_subtasks_tab(
     app.config.search_results_style_work_item_status = False
     app.config.search_results_style_work_item_type = False
     app.config.search_results_per_page = 10
-    app.config.git_repositories = None
     app.config.jira_base_url = 'foo.bar'
     app.config.enable_goto = True
     search_work_items_mock.return_value = WorkItemSearchResult(
@@ -4353,7 +4322,6 @@ async def test_action_page_up_in_subtasks_tab(
     app.config.search_results_style_work_item_status = False
     app.config.search_results_style_work_item_type = False
     app.config.search_results_per_page = 10
-    app.config.git_repositories = None
     app.config.jira_base_url = 'foo.bar'
     search_work_items_mock.return_value = WorkItemSearchResult(
         response=JiraIssueSearchResponse(issues=jira_issues),
@@ -4394,7 +4362,6 @@ async def test_action_page_down_in_subtasks_tab(
     app.config.search_results_style_work_item_status = False
     app.config.search_results_style_work_item_type = False
     app.config.search_results_per_page = 10
-    app.config.git_repositories = None
     app.config.jira_base_url = 'foo.bar'
     search_work_items_mock.return_value = WorkItemSearchResult(
         response=JiraIssueSearchResponse(issues=jira_issues),
@@ -4435,7 +4402,6 @@ async def test_action_scroll_home_in_subtasks_tab(
     app.config.search_results_style_work_item_status = False
     app.config.search_results_style_work_item_type = False
     app.config.search_results_per_page = 10
-    app.config.git_repositories = None
     app.config.jira_base_url = 'foo.bar'
     search_work_items_mock.return_value = WorkItemSearchResult(
         response=JiraIssueSearchResponse(issues=jira_issues),
@@ -4476,7 +4442,6 @@ async def test_action_scroll_end_in_subtasks_tab(
     app.config.search_results_style_work_item_status = False
     app.config.search_results_style_work_item_type = False
     app.config.search_results_per_page = 10
-    app.config.git_repositories = None
     app.config.jira_base_url = 'foo.bar'
     search_work_items_mock.return_value = WorkItemSearchResult(
         response=JiraIssueSearchResponse(issues=jira_issues),
@@ -4517,7 +4482,6 @@ async def test_action_scroll_up_in_subtasks_tab(
     app.config.search_results_style_work_item_status = False
     app.config.search_results_style_work_item_type = False
     app.config.search_results_per_page = 10
-    app.config.git_repositories = None
     app.config.jira_base_url = 'foo.bar'
     search_work_items_mock.return_value = WorkItemSearchResult(
         response=JiraIssueSearchResponse(issues=jira_issues),
@@ -4559,7 +4523,6 @@ async def test_action_scroll_down_in_subtasks_tab(
     app.config.search_results_style_work_item_status = False
     app.config.search_results_style_work_item_type = False
     app.config.search_results_per_page = 10
-    app.config.git_repositories = None
     app.config.jira_base_url = 'foo.bar'
     search_work_items_mock.return_value = WorkItemSearchResult(
         response=JiraIssueSearchResponse(issues=jira_issues),
@@ -5409,11 +5372,11 @@ def test_main_screen_actions_and_bindings(bindings: dict):
             tooltip='Shows the recent history',
         ),
         UIAction(
-            action='create_git_branch',
-            keys=bindings.get('create_git_branch', {}).get('keys', []),
-            description='Git',
-            show=True,
-            tooltip='Creates a Git branch for a work item',
+            action='reload_view',
+            keys=bindings.get('reload_view', {}).get('keys', []),
+            description='Reload View',
+            show=False,
+            tooltip='Loads the active view again',
         ),
     ]
     assert MainScreen.BINDINGS == [
@@ -5706,17 +5669,20 @@ def test_main_screen_actions_and_bindings(bindings: dict):
             group=None,
         ),
         Binding(
-            key=bindings.get('create_git_branch', {}).get('keys', [])[0],
-            action='create_git_branch',
-            description='Git',
-            show=True,
+            key=bindings.get('reload_view', {}).get('keys', [])[0],
+            action='reload_view',
+            description='Reload View',
+            show=False,
             key_display=None,
             priority=False,
-            tooltip='Creates a Git branch for a work item',
+            tooltip='Loads the active view again',
             id=None,
             system=False,
             group=None,
         ),
+    ] + [
+        Binding(key=key, action=f'load_view({position})', show=False)
+        for position, key in enumerate(bindings.get('load_view', {}).get('keys', []), start=1)
     ]
 
 

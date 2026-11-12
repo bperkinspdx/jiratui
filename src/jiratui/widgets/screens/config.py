@@ -85,7 +85,7 @@ class ConfigFileScreen(ModalScreen):
 
     @property
     def _json_fields(self) -> list[str]:
-        return ['pre_defined_jql_expressions', 'styling', 'git_repositories', 'ssl']
+        return ['pre_defined_jql_expressions', 'styling', 'views', 'status_sections', 'ssl']
 
     @on(DataTable.RowSelected)
     def _toggle_left_vertical_container(self, event: DataTable.RowSelected) -> None:

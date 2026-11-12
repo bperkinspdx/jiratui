@@ -5,6 +5,22 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [Unreleased]
+
+### Added
+
+- Add views: named searches defined in the new `views` setting, listed in a views bar above the search results and
+loaded with `alt+1`…`alt+9` or a click. A view loads all its work items, up to `view_max_results`, as one list, and
+`alt+r` reloads it. A view with `related_to` selects the sub-tasks of, and the work items linked to, another set of
+work items. `startup_view` loads a view when the application starts.
+- Add status sections: the new `status_sections` setting groups the search results into collapsible sections of
+statuses, each under a heading with its label and work item count.
+
+### Removed
+
+- Remove the action that creates Git branches from a work item, its `git_repositories` setting and the `gitpython`
+dependency.
+
 ## [1.19.0] 2026-11-08
 
 ### Added

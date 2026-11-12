@@ -35,11 +35,6 @@
 ```{autodoc2-object} jiratui.widgets.screens.jql.JQLEditorScreen
 ```
 
-## GitScreen
-
-```{autodoc2-object} jiratui.widgets.screens.git.GitScreen
-```
-
 ## TextSearchScreen
 
 ```{autodoc2-object} jiratui.widgets.screens.text_search.TextSearchScreen

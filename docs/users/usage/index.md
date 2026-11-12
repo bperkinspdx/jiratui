@@ -217,7 +217,8 @@ context.
 | `f3`         | View the configuration file                                                 | Main Screen                                                             |
 | `f4`         | Shows the recent history                                                    | Main Screen                                                             |
 | `f5`         | View items related to the currently selected work item                      | Main Screen                                                             |
-| `f6`         | Creates a Git branch for a work item                                        | Main Screen                                                             |
+| `alt+1`…`alt+9` | Loads the configured view in that position                               | Main Screen                                                             |
+| `alt+r`      | Loads the active view again                                                 | Main Screen                                                             |
 | `alt+p`      | Focuses the project dropdown                                                | Main Screen                                                             |
 | `alt+t`      | Focuses the work item types dropdown                                        | Main Screen                                                             |
 | `alt+s`      | Focuses the work item statuses dropdown                                     | Main Screen                                                             |
@@ -319,7 +320,8 @@ context.
 | `f7`                | Shows the recent history                                 |         |
 | `^k`                | Copy the work item key                                   |         |
 | `^j`                | Copy the work item URL                                   |         |
-| `^g`                | Creates a Git branch for a work item                     |         |
+| `alt+1`…`alt+9`     | Loads the configured view in that position               |         |
+| `alt+r`             | Loads the active view again                              |         |
 | `.`                 | Filter work items in the search results table            |         |
 | `alt+left`          | Go to the previous page                                  |         |
 | `alt+right`         | Go to the next page                                      |         |

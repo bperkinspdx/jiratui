@@ -50,10 +50,22 @@ search_results_page_filtering_minimum_term_length: 3
 full_text_search_minimum_term_length: 3
 enable_advanced_full_text_search: true
 search_results_default_order: 'created desc'
-git_repositories:
-  1:
-    name: 'My Cool Project'
-    path: '/projects/my-cool-project/.git'
+views:
+  - label: 'My work'
+    jql: 'assignee = currentUser() AND statusCategory != Done'
+  - label: 'Bugs on my work'
+    related_to: 'assignee = currentUser() AND statusCategory != Done'
+    jql: 'issuetype = Bug'
+startup_view: null
+view_max_results: 200
+status_sections:
+  - label: 'To Do'
+    statuses: ['To Do']
+  - label: 'In Progress'
+    statuses: ['In Progress']
+  - label: 'Done'
+    statuses: ['Done']
+    collapsed: true
 search_on_startup: false
 enable_updating_additional_fields: false
 update_additional_fields_ignore_ids: null

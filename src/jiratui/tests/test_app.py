@@ -18,6 +18,10 @@ from jiratui.widgets.screens.server import ServerInfoScreen
 def app_with_unrecognized_config_theme() -> JiraApp:
     config_mock = Mock(spec=ApplicationConfiguration)
     config_mock.configure_mock(
+        views=None,
+        startup_view=None,
+        view_max_results=200,
+        status_sections=None,
         jira_api_base_url='foo.bar',
         jira_api_username='foo',
         jira_api_token=SecretStr('bar'),
@@ -56,6 +60,10 @@ def app_with_unrecognized_config_theme() -> JiraApp:
 def app_with_input_and_config_theme() -> JiraApp:
     config_mock = Mock(spec=ApplicationConfiguration)
     config_mock.configure_mock(
+        views=None,
+        startup_view=None,
+        view_max_results=200,
+        status_sections=None,
         jira_api_base_url='foo.bar',
         jira_api_username='foo',
         jira_api_token=SecretStr('bar'),
@@ -94,6 +102,10 @@ def app_with_input_and_config_theme() -> JiraApp:
 def app_with_input_theme() -> JiraApp:
     config_mock = Mock(spec=ApplicationConfiguration)
     config_mock.configure_mock(
+        views=None,
+        startup_view=None,
+        view_max_results=200,
+        status_sections=None,
         jira_api_base_url='foo.bar',
         jira_api_username='foo',
         jira_api_token=SecretStr('bar'),
@@ -132,6 +144,10 @@ def app_with_input_theme() -> JiraApp:
 def app_without_config_theme() -> JiraApp:
     config_mock = Mock(spec=ApplicationConfiguration)
     config_mock.configure_mock(
+        views=None,
+        startup_view=None,
+        view_max_results=200,
+        status_sections=None,
         jira_api_base_url='foo.bar',
         jira_api_username='foo',
         jira_api_token=SecretStr('bar'),
@@ -170,6 +186,10 @@ def app_without_config_theme() -> JiraApp:
 def app() -> JiraApp:
     config_mock = Mock(spec=ApplicationConfiguration)
     config_mock.configure_mock(
+        views=None,
+        startup_view=None,
+        view_max_results=200,
+        status_sections=None,
         jira_api_base_url='foo.bar',
         jira_api_username='foo',
         jira_api_token=SecretStr('bar'),
@@ -561,6 +581,10 @@ async def test_application_with_unrecognized_config_theme(
 def config_dict() -> dict:
     """Base configuration dictionary for testing."""
     return {
+        'views': None,
+        'startup_view': None,
+        'view_max_results': 200,
+        'status_sections': None,
         'jira_api_base_url': 'foo.bar',
         'jira_api_username': 'foo',
         'jira_api_token': SecretStr('foo'),

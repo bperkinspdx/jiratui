@@ -78,6 +78,46 @@ class StylingConfiguration(BaseModel):
     """
 
 
+class StatusSectionConfiguration(BaseModel):
+    """A section of the search results that holds the work items in one or more statuses.
+
+    E.g.:
+    ```yaml
+    label: 'Done'
+    statuses: ['Done', 'Closed', "Won't Do"]
+    collapsed: true
+    ```
+    """
+
+    label: str
+    """The heading of the section."""
+    statuses: list[str]
+    """The names of the statuses whose work items the section holds. Names match regardless of case."""
+    collapsed: bool = False
+    """If `True` the section starts collapsed, showing its heading and count but not its work items."""
+
+
+class WorkItemsViewConfiguration(BaseModel):
+    """A named search that a single key loads.
+
+    E.g.:
+    ```yaml
+    label: 'Bugs on my work'
+    related_to: 'assignee = currentUser() AND statusCategory != Done'
+    jql: 'issuetype = Bug'
+    ```
+    """
+
+    label: str
+    """The name of the view, shown in the views bar."""
+    jql: str
+    """The JQL that selects the view's work items. Without an ORDER BY clause the view orders them by rank, the order
+    of a board."""
+    related_to: str | None = None
+    """When set, the view selects the work items that are sub-tasks of, or linked to, the work items this JQL selects,
+    and `jql` narrows them further."""
+
+
 class ApplicationConfiguration(BaseSettings):
     """The configuration for the JiraTUI application and CLI tool."""
 
@@ -221,17 +261,19 @@ class ApplicationConfiguration(BaseSettings):
     The columns supported are: `status`, `issuetype`, `parent`, `assignee`, `reporter`, `summary`. If none is provided
     then the default list of columns will be: `key`, `status`, `issuetype`, `parent', `summary`.
     """
-    git_repositories: dict | None = None
-    """The Git repositories to create new branches based on work items. It expects a mapping from user-defined IDs into
-    a dictionary with the name of the repository and the path to the directory that contains the .git directory.
-    E.g.:
-    ```python
-    1: {
-        'name': 'The repo for my cool application',
-        'path': '/my/repository/.git,
-    }
-    ```
-    """
+    views: list[WorkItemsViewConfiguration] | None = None
+    """Named searches shown in the views bar above the search results. `alt+1` loads the first, `alt+2` the second,
+    and so on up to the ninth; clicking a view in the bar loads it too. A view loads all its work items, up to
+    `view_max_results`, as one list instead of pages."""
+    startup_view: int | None = None
+    """The 1-based position in `views` of the view to load when the application starts. When set, it takes the place
+    of `search_on_startup`."""
+    view_max_results: int = 200
+    """The maximum number of work items a view loads."""
+    status_sections: list[StatusSectionConfiguration] | None = None
+    """When set, the search results are grouped into these sections, in this order, each with a heading that shows its
+    label and the number of work items in it. Selecting a heading collapses or expands its section. A status that no
+    section names gets a section of its own after these. Sections with no work items are left out."""
     search_on_startup: bool = False
     """If `True`, triggers a search automatically when the UI starts. Can be set via CLI argument
     `--search-on-startup`."""

@@ -22,6 +22,10 @@ from jiratui.widgets.search import (
 def app() -> JiraApp:
     config_mock = Mock(spec=ApplicationConfiguration)
     config_mock.configure_mock(
+        views=None,
+        startup_view=None,
+        view_max_results=200,
+        status_sections=None,
         jira_api_base_url='foo.bar',
         jira_api_username='foo',
         jira_api_token=SecretStr('bar'),

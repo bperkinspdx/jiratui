@@ -138,33 +138,57 @@ search_results_default_order: 'created desc'
 
 You can still change the order interactively in the UI; this setting only controls the initial/default value.
 
-## Setting Git Repositories
+## Defining Views
 
-Starting with `v1.3.0` JiraTUI allows users to create Git branches directly from the UI. Once you select a work item,
-you can press `^g` to open up a dialog to create a new Git branch using the work item's key as the initial value for the
-branch.
+A view is a named search that a single key loads. Define views with the configuration variable `views`; the views bar
+above the search results lists them, `alt+1` loads the first, `alt+2` the second, and so on up to the ninth. Clicking a
+view in the bar loads it too, and `alt+r` loads the active view again.
 
-To support this you need to configure the repositories that the tool can use to create branches. In principle there is
-no direct connection between projects and Git repos. A project may use different repos and a repo may be used in
-different projects. Because of this you need to configure the Git repos you want to use.
+Each view has a `label` and a `jql`. A view loads all its work items as one list, up to `view_max_results` (default
+200), instead of pages. Without its own `ORDER BY` clause a view orders its work items by rank, the order of a board.
 
-You can do this via the configuration variable `git_repositories`. Using this setting you define repositories
-specifying an ID, a name and a path to the repository's `.git` directory.
+A view with `related_to` selects work items related to another set: the sub-tasks of, and the work items linked to, the
+work items its `related_to` JQL selects. Its `jql` then narrows those, e.g. to bugs or tests.
+
+Set `startup_view` to a view's position to load it when the application starts; it takes the place of
+`search_on_startup`.
 
 **Example**:
 
 ```yaml
-git_repositories:
-   1:
-      name: 'My Project A'
-      path: '/projects/project-a/.git'
-   2:
-      name: 'My Project B'
-      path: '/projects/project-b/.git'
+views:
+  - label: 'My work'
+    jql: 'assignee = currentUser() AND (statusCategory != Done OR statusCategoryChangedDate >= -14d)'
+  - label: 'Pick up'
+    jql: 'project = ABC AND status = Ready AND assignee is EMPTY'
+  - label: 'Bugs on my work'
+    related_to: 'assignee = currentUser() AND statusCategory != Done'
+    jql: 'issuetype in (Bug, Sub-bug)'
+startup_view: 1
 ```
 
-Using this configuration JiraTUI will be able to display these repositories and, you will be able to choose the target
-repo for creating a new branch.
+## Grouping Search Results by Status
+
+Set `status_sections` to group the search results into sections, in the order you list them, each under a heading with
+its label and the number of its work items. A section holds the work items in any of its `statuses`; names match
+regardless of case. Pressing `enter` on a heading collapses or expands its section, and `collapsed: true` makes a
+section start collapsed. A status no section names gets a section of its own after the configured ones, and sections
+with no work items are left out. Work items keep their numbers whether or not their section is collapsed.
+
+**Example**, following the columns of a board:
+
+```yaml
+status_sections:
+  - label: 'Backlog'
+    statuses: ['Backlog', 'Selected for Development']
+  - label: 'In Progress'
+    statuses: ['In Progress']
+  - label: 'In Review'
+    statuses: ['In Review']
+  - label: 'Done'
+    statuses: ['Done', "Won't Do"]
+    collapsed: true
+```
 
 ## Enable Updating Additional Fields
 

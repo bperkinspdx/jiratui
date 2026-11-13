@@ -10,6 +10,8 @@ from jiratui.models import JiraIssue
 DEFAULT_VIEW_ORDER_BY = 'ORDER BY Rank ASC'
 """Views without their own ORDER BY clause follow board rank, so each status section reads like a board column."""
 
+DONE_STATUS_CATEGORY_KEY = 'done'
+
 _ORDER_BY = re.compile(r'\border\s+by\b', re.IGNORECASE)
 
 
@@ -21,6 +23,16 @@ class WorkItemSection:
     work_items: list[JiraIssue] = field(default_factory=list)
     collapsed: bool = False
     """Whether the section starts collapsed."""
+    color: str | None = None
+    """The configured color of the section heading, if any."""
+
+
+def fields_for_status_sections(sections: Sequence[StatusSectionConfiguration] | None) -> list[str]:
+    """Returns the work item fields that grouping into `sections` needs beyond the displayed columns."""
+
+    if sections and any(section.labels for section in sections):
+        return ['labels']
+    return []
 
 
 def split_order_by(jql: str) -> tuple[str, str]:
@@ -82,8 +94,11 @@ def group_work_items_by_status(
 ) -> list[WorkItemSection]:
     """Groups work items into the configured status sections.
 
-    Sections keep their configured order and are left out when empty. A status that no section names gets a section of
-    its own, labelled with the status name, after the configured ones. Status names match regardless of case.
+    An unfinished work item that carries a label of a section that names labels goes to the first such section,
+    whatever its status, provided the section names no statuses or names the work item's status. Every other work item
+    goes to the section that names its status. A status that no section names gets a section of its own, labelled with
+    the status name, after the configured ones. Sections keep their configured order and are left out when empty.
+    Status names and labels match regardless of case.
 
     Args:
         work_items: the work items to group.
@@ -94,23 +109,51 @@ def group_work_items_by_status(
     """
 
     grouped = [
-        WorkItemSection(label=section.label, collapsed=section.collapsed) for section in sections
+        WorkItemSection(label=section.label, collapsed=section.collapsed, color=section.color)
+        for section in sections
     ]
     position_by_status = {
         status.casefold(): position
         for position, section in enumerate(sections)
+        if not section.labels
         for status in section.statuses
     }
+    label_sections = [
+        (
+            position,
+            {label.casefold() for label in section.labels},
+            {status.casefold() for status in section.statuses},
+        )
+        for position, section in enumerate(sections)
+        if section.labels
+    ]
     unconfigured: dict[str, WorkItemSection] = {}
     for work_item in work_items:
         status_name = work_item.status_name
-        if (position := position_by_status.get(status_name.casefold())) is not None:
+        if (position := _label_section_position(work_item, label_sections)) is not None:
+            grouped[position].work_items.append(work_item)
+        elif (position := position_by_status.get(status_name.casefold())) is not None:
             grouped[position].work_items.append(work_item)
         else:
             unconfigured.setdefault(
                 status_name.casefold(), WorkItemSection(label=status_name or 'No status')
             ).work_items.append(work_item)
     return [section for section in grouped if section.work_items] + list(unconfigured.values())
+
+
+def _label_section_position(
+    work_item: JiraIssue, label_sections: list[tuple[int, set[str], set[str]]]
+) -> int | None:
+    """Returns the position of the first label section that claims `work_item`, or `None` when none does."""
+
+    if not work_item.labels or work_item.status.category_key == DONE_STATUS_CATEGORY_KEY:
+        return None
+    work_item_labels = {label.casefold() for label in work_item.labels}
+    status_name = work_item.status_name.casefold()
+    for position, labels, statuses in label_sections:
+        if work_item_labels & labels and (not statuses or status_name in statuses):
+            return position
+    return None
 
 
 def _mask_quoted_text(jql: str) -> str:

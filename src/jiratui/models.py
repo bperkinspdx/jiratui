@@ -139,6 +139,8 @@ class IssueStatus(BaseModel):
     id: str
     name: str
     description: str | None = None
+    category_key: str | None = None
+    """The key of the status category: `new`, `indeterminate` or `done`; `None` when the API response omits it."""
 
 
 @dataclass

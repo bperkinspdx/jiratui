@@ -6887,6 +6887,13 @@ def test_issues_search_results_table_actions_and_bindings(bindings):
             show=True,
             tooltip='Open context menu',
         ),
+        UIAction(
+            action=SupportedActions.TOGGLE_SECTION.value,
+            keys=bindings.get(SupportedActions.TOGGLE_SECTION.value, {}).get('keys', []),
+            description='Toggle Section',
+            show=False,
+            tooltip='Collapses or expands the status section whose heading is under the cursor',
+        ),
     ]
     assert IssuesSearchResultsTable.BINDINGS == [
         Binding(
@@ -7107,6 +7114,18 @@ def test_issues_search_results_table_actions_and_bindings(bindings):
             key_display=None,
             priority=False,
             tooltip='Open context menu',
+            id=None,
+            system=False,
+            group=None,
+        ),
+        Binding(
+            key='space',
+            action='toggle_section',
+            description='Toggle Section',
+            show=False,
+            key_display=None,
+            priority=False,
+            tooltip='Collapses or expands the status section whose heading is under the cursor',
             id=None,
             system=False,
             group=None,

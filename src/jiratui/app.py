@@ -4,6 +4,7 @@ from pathlib import Path
 import sys
 
 from pythonjsonlogger.json import JsonFormatter
+from textual import events
 from textual.app import App, InvalidThemeError
 from textual.binding import Binding
 
@@ -22,9 +23,16 @@ from jiratui.widgets.screens.config import ConfigFileScreen
 from jiratui.widgets.screens.quit import QuitScreen
 from jiratui.widgets.screens.server import ServerInfoScreen
 
+DOUBLE_CTRL_C_SECONDS = 0.5
+"""Two presses of ctrl+c within this many seconds quit the app, as ctrl+q does."""
+
 
 class JiraApp(Actionable, App, inherit_bindings=False):  # type:ignore[call-arg]
-    """Implements the application."""
+    """Implements the application.
+
+    Pressing ctrl+c twice within `DOUBLE_CTRL_C_SECONDS` quits, as ctrl+q does. The first press still does whatever
+    ctrl+c does where the focus is, e.g. copying the work item URL or the selected text.
+    """
 
     CSS_PATH = 'css/jt.tcss'
     """The path to the file with the TCSS (Textual CSS) definitions."""
@@ -134,6 +142,7 @@ class JiraApp(Actionable, App, inherit_bindings=False):  # type:ignore[call-arg]
         )
         self._setup_theme(user_theme)
         self._recent_history_manager = HistoryManager()
+        self._last_ctrl_c_time: float | None = None
 
     @property
     def recent_history_manager(self) -> HistoryManager:
@@ -197,6 +206,20 @@ class JiraApp(Actionable, App, inherit_bindings=False):  # type:ignore[call-arg]
     async def action_config_info(self) -> None:
         """Handles the event to show the config file"""
         await self.push_screen(ConfigFileScreen())
+
+    async def on_event(self, event: events.Event) -> None:
+        """Quits on the second of two quick ctrl+c presses; every other event, and a first ctrl+c, passes through.
+
+        Every key reaches the app before any widget or binding, so this sees ctrl+c wherever the focus is.
+        """
+
+        if isinstance(event, events.Key) and not event.is_forwarded and event.key == 'ctrl+c':
+            last, self._last_ctrl_c_time = self._last_ctrl_c_time, event.time
+            if last is not None and event.time - last <= DOUBLE_CTRL_C_SECONDS:
+                self._last_ctrl_c_time = None
+                await self.action_quit()
+                return
+        await super().on_event(event)
 
     async def action_quit(self) -> None:
         """Handles the event to quit the application."""

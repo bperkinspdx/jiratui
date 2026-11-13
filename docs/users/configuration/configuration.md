@@ -171,7 +171,7 @@ startup_view: 1
 
 Set `status_sections` to group the search results into sections, in the order you list them, each under a heading with
 its label and the number of its work items. A section holds the work items in any of its `statuses`; names match
-regardless of case. Pressing `enter` on a heading collapses or expands its section, and `collapsed: true` makes a
+regardless of case. Pressing `enter` or `space` on a heading collapses or expands its section, and `collapsed: true` makes a
 section start collapsed. A status no section names gets a section of its own after the configured ones, and sections
 with no work items are left out. Work items keep their numbers whether or not their section is collapsed.
 
@@ -188,6 +188,23 @@ status_sections:
   - label: 'Done'
     statuses: ['Done', "Won't Do"]
     collapsed: true
+```
+
+A section can gather work items by label instead, e.g. to show blocked work even though the workflow has no Blocked
+status. Such a section names `labels`, and an unfinished work item that carries any of them goes there, whatever its
+status, ahead of its status section; finished means a status in Jira's Done category, so stale labels on finished work
+are ignored. Adding `statuses` to a label section narrows it to labelled work items in those statuses. `color` sets the
+heading's color; without it a heading takes the color of its first work item's status.
+
+```yaml
+status_sections:
+  - label: 'Ready'
+    statuses: ['Ready']
+  - label: 'Blocked'
+    labels: ['Blocked', 'On_Hold']
+    color: 'red'
+  - label: 'In Progress'
+    statuses: ['In Progress']
 ```
 
 ## Enable Updating Additional Fields

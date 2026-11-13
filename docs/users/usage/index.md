@@ -211,6 +211,7 @@ context.
 |--------------|-----------------------------------------------------------------------------|-------------------------------------------------------------------------|
 | `tab`        | Focus next element                                                          | Anywhere                                                                |
 | `^q`         | Closes the app                                                              | Main Screen                                                             |
+| `^c` `^c`    | Closes the app when pressed twice within half a second                      | Anywhere                                                                |
 | `q`          | Closes the app                                                              | Main Screen                                                             |
 | `f1`         | Open the help                                                               | Main Screen                                                             |
 | `f2`         | View details of your Jira server                                            | Main Screen                                                             |
@@ -219,6 +220,7 @@ context.
 | `f5`         | View items related to the currently selected work item                      | Main Screen                                                             |
 | `alt+1`…`alt+9` | Loads the configured view in that position                               | Main Screen                                                             |
 | `alt+r`      | Loads the active view again                                                 | Main Screen                                                             |
+| `space`      | Collapses or expands the status section under the cursor                    | Search results                                                          |
 | `alt+p`      | Focuses the project dropdown                                                | Main Screen                                                             |
 | `alt+t`      | Focuses the work item types dropdown                                        | Main Screen                                                             |
 | `alt+s`      | Focuses the work item statuses dropdown                                     | Main Screen                                                             |
@@ -293,6 +295,7 @@ context.
 |---------------------|----------------------------------------------------------|---------|
 | `tab`               | Focus next element                                       |         |
 | `^q`                | Closes the app                                           |         |
+| `^c` `^c`           | Closes the app when pressed twice within half a second   |         |
 | `f1`, `^?`, `^+shift+\` | Open the help                                            |         |
 | `f2`                | View details of your Jira server                         |         |
 | `f3`                | View the configuration file                              |         |
@@ -322,6 +325,7 @@ context.
 | `^j`                | Copy the work item URL                                   |         |
 | `alt+1`…`alt+9`     | Loads the configured view in that position               |         |
 | `alt+r`             | Loads the active view again                              |         |
+| `space`             | Collapses or expands the status section under the cursor |         |
 | `.`                 | Filter work items in the search results table            |         |
 | `alt+left`          | Go to the previous page                                  |         |
 | `alt+right`         | Go to the next page                                      |         |

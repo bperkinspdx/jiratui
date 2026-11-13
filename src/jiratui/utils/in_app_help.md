@@ -21,6 +21,7 @@ context.
 | `tab`        | Focus next element                                     | Anywhere                                                          |
 | `^q`         | Closes the app                                         | Main Screen                                                             |
 | `q`          | Closes the app                                         | Main Screen                                                             |
+| `^c` `^c`    | Closes the app when pressed twice within half a second | Anywhere                                                                |
 | `f1`         | Open the help                                          | Main Screen                                                             |
 | `f2`         | View details of your Jira server                       | Main Screen                                                             |
 | `f3`         | View the configuration file                            | Main Screen                                                             |
@@ -28,6 +29,7 @@ context.
 | `f5`         | View items related to the currently selected work item | Main Screen                                                             |
 | `alt+1`…`alt+9` | Loads the configured view in that position          | Main Screen                                                             |
 | `alt+r`      | Loads the active view again                            | Main Screen                                                             |
+| `space`      | Collapses or expands the status section under the cursor | Search results                                                        |
 | `alt+p`      | Focuses the project dropdown                           | Main Screen                                                             |
 | `alt+t`      | Focuses the work item types dropdown                   | Main Screen                                                             |
 | `alt+s`      | Focuses the work item statuses dropdown                | Main Screen                                                             |
@@ -102,6 +104,7 @@ context.
 |-------------------------|----------------------------------------------------------|---------|
 | `tab`                   | Focus next element                                       |         |
 | `^q`                    | Closes the app                                           |         |
+| `^c` `^c`               | Closes the app when pressed twice within half a second   |         |
 | `f1`, `^?`, `^+shift+\` | Open the help                                            |         |
 | `f2`                    | View details of your Jira server                         |         |
 | `f3`                    | View the configuration file                              |         |
@@ -131,6 +134,7 @@ context.
 | `^j`                    | Copy the work item URL                                   |         |
 | `alt+1`…`alt+9`         | Loads the configured view in that position               |         |
 | `alt+r`                 | Loads the active view again                              |         |
+| `space`                 | Collapses or expands the status section under the cursor |         |
 | `.`                     | Filter work items in the search results table            |         |
 | `alt+left`              | Go to the previous page                                  |         |
 | `alt+right`             | Go to the next page                                      |         |
@@ -358,9 +362,12 @@ Setting `startup_view` to a view's position loads that view when the app starts.
 # Status Sections
 
 When the configuration variable `status_sections` is set, the search results are grouped into those sections, each
-under a heading with its label and the number of its work items. Pressing `enter` on a heading collapses or expands its
-section; a section configured with `collapsed: true` starts collapsed. A status that no section names gets a section
+under a heading with its label and the number of its work items. Pressing `enter` or `space` on a heading collapses or
+expands its section; a section configured with `collapsed: true` starts collapsed. A status that no section names gets a section
 of its own after the configured ones. Work items keep their numbers whether or not their section is collapsed.
+
+A section that names `labels` gathers the unfinished work items carrying any of those labels, whatever their status,
+e.g. a Blocked section for a workflow without a Blocked status.
 
 # Creating Work Items
 

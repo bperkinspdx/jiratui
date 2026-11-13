@@ -79,7 +79,7 @@ class StylingConfiguration(BaseModel):
 
 
 class StatusSectionConfiguration(BaseModel):
-    """A section of the search results that holds the work items in one or more statuses.
+    """A section of the search results that holds the work items in one or more statuses, or that carry a label.
 
     E.g.:
     ```yaml
@@ -87,14 +87,29 @@ class StatusSectionConfiguration(BaseModel):
     statuses: ['Done', 'Closed', "Won't Do"]
     collapsed: true
     ```
+
+    A section that names `labels` holds the unfinished work items that carry any of them, ahead of their status
+    sections; finished means a status in Jira's Done category. E.g.:
+    ```yaml
+    label: 'Blocked'
+    labels: ['Blocked', 'On_Hold']
+    color: 'red'
+    ```
     """
 
     label: str
     """The heading of the section."""
-    statuses: list[str]
-    """The names of the statuses whose work items the section holds. Names match regardless of case."""
+    statuses: list[str] = Field(default_factory=list)
+    """The names of the statuses whose work items the section holds. In a section that names `labels`, it narrows
+    the labelled work items to those in these statuses. Names match regardless of case."""
+    labels: list[str] = Field(default_factory=list)
+    """Labels that put an unfinished work item in this section whatever its status. Labels match regardless of
+    case."""
     collapsed: bool = False
     """If `True` the section starts collapsed, showing its heading and count but not its work items."""
+    color: str | None = None
+    """The color of the section heading, as a color name or hex code. Without it the heading takes the color of
+    the status of its first work item."""
 
 
 class WorkItemsViewConfiguration(BaseModel):
@@ -272,8 +287,10 @@ class ApplicationConfiguration(BaseSettings):
     """The maximum number of work items a view loads."""
     status_sections: list[StatusSectionConfiguration] | None = None
     """When set, the search results are grouped into these sections, in this order, each with a heading that shows its
-    label and the number of work items in it. Selecting a heading collapses or expands its section. A status that no
-    section names gets a section of its own after these. Sections with no work items are left out."""
+    label and the number of work items in it. Selecting a heading collapses or expands its section. An unfinished work
+    item that carries a label a section names goes to that section; any other work item goes to the section naming its
+    status. A status that no section names gets a section of its own after these. Sections with no work items are left
+    out."""
     search_on_startup: bool = False
     """If `True`, triggers a search automatically when the UI starts. Can be set via CLI argument
     `--search-on-startup`."""

@@ -259,6 +259,7 @@ def test_build_issue_instance(config_for_testing):
     assert issue.status == IssueStatus(
         name='In Progress',
         id='10001',
+        category_key='indeterminate',
     )
     assert issue.project == Project(id='10000', name='Test Project', key='SCRUM')
     assert issue.created == datetime(2025, 7, 5, 14, 34, 59)
@@ -327,6 +328,7 @@ def test_build_issue_instance_with_more_details(config_for_testing):
         status=IssueStatus(
             name='In Progress',
             id='10001',
+            category_key='indeterminate',
         ),
         project=Project(id='10000', name='Test Project', key='SCRUM'),
         created=datetime(2025, 7, 5, 14, 34, 59),
@@ -560,6 +562,7 @@ def test_build_issue_instance_with_more_details_no_adf(config_for_testing):
         status=IssueStatus(
             name='In Progress',
             id='10001',
+            category_key='indeterminate',
         ),
         project=Project(id='10000', name='Test Project', key='SCRUM'),
         created=datetime(2025, 7, 5, 14, 34, 59),

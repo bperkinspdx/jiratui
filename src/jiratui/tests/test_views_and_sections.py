@@ -333,3 +333,131 @@ async def test_no_views_bar_without_views(
         main_screen = cast('MainScreen', sectioned_app.screen)  # type:ignore[name-defined] # noqa: F821
         # THEN
         assert main_screen.views_bar is None
+
+
+@patch('jiratui.api_controller.controller.APIController.search_view_work_items')
+@patch('jiratui.widgets.screen.MainScreen.fetch_statuses')
+@patch('jiratui.widgets.screen.MainScreen.fetch_issue_types')
+@patch('jiratui.widgets.screen.MainScreen.fetch_projects')
+@pytest.mark.asyncio
+async def test_a_label_section_gathers_labelled_work_items_under_its_colored_heading(
+    fetch_projects_mock,
+    fetch_issue_types_mock,
+    fetch_statuses_mock,
+    search_view_work_items_mock: AsyncMock,
+    sectioned_app,
+):
+    sectioned_app.config.views = VIEWS
+    sectioned_app.config.status_sections = [
+        StatusSectionConfiguration(label='Ready', statuses=['Ready']),
+        StatusSectionConfiguration(label='Blocked', labels=['Blocked'], color='red'),
+        StatusSectionConfiguration(label='Code Review', statuses=['Code Review']),
+    ]
+    blocked = _work_item('A-6', 'Code Review')
+    blocked.labels = ['Blocked']
+    search_view_work_items_mock.return_value = APIControllerResponse(
+        result=JiraIssueSearchResponse(issues=[WORK_ITEMS[0], blocked, WORK_ITEMS[2]], is_last=True)
+    )
+    async with sectioned_app.run_test() as pilot:
+        main_screen = cast('MainScreen', sectioned_app.screen)  # type:ignore[name-defined] # noqa: F821
+        # WHEN
+        await pilot.press('alt+1')
+        await sectioned_app.workers.wait_for_complete()
+        await pilot.pause()
+        # THEN
+        assert 'labels' in search_view_work_items_mock.await_args.kwargs['fields']
+        assert _first_cells(main_screen) == [
+            '▼ Ready (1)',
+            '1 A-3',
+            '▼ Blocked (1)',
+            '2 A-6',
+            '▼ Code Review (1)',
+            '3 A-1',
+        ]
+        heading = main_screen.search_results_table.get_row_at(2)[1]
+        assert str(heading.style) == 'bold red'
+
+
+@patch('jiratui.widgets.screen.MainScreen.fetch_statuses')
+@patch('jiratui.widgets.screen.MainScreen.fetch_issue_types')
+@patch('jiratui.widgets.screen.MainScreen.fetch_projects')
+@pytest.mark.asyncio
+async def test_space_toggles_the_section_under_the_cursor_and_ignores_work_items(
+    fetch_projects_mock, fetch_issue_types_mock, fetch_statuses_mock, sectioned_app
+):
+    async with sectioned_app.run_test() as pilot:
+        main_screen = cast('MainScreen', sectioned_app.screen)  # type:ignore[name-defined] # noqa: F821
+        table = main_screen.search_results_table
+        table.search_results = JiraIssueSearchResponse(issues=WORK_ITEMS)
+        table.focus()
+        ready_heading = f'{SECTION_ROW_KEY_PREFIX}0'
+        table.move_cursor(row=table.get_row_index(ready_heading))
+        await pilot.pause()
+        # WHEN
+        await pilot.press('space')
+        await pilot.pause()
+        # THEN
+        assert '3#A-3' not in _row_keys(main_screen)
+        assert table.cursor_row == table.get_row_index(ready_heading)
+        # WHEN
+        await pilot.press('space')
+        await pilot.pause()
+        # THEN
+        assert '3#A-3' in _row_keys(main_screen)
+        # WHEN the cursor is on a work item
+        table.move_cursor(row=table.get_row_index('3#A-3'))
+        await pilot.pause()
+        await pilot.press('space')
+        await pilot.pause()
+        # THEN
+        assert '3#A-3' in _row_keys(main_screen)
+
+
+@patch('jiratui.app.JiraApp.action_quit')
+@patch('jiratui.widgets.screen.MainScreen.fetch_statuses')
+@patch('jiratui.widgets.screen.MainScreen.fetch_issue_types')
+@patch('jiratui.widgets.screen.MainScreen.fetch_projects')
+@pytest.mark.asyncio
+async def test_two_quick_ctrl_c_presses_quit(
+    fetch_projects_mock,
+    fetch_issue_types_mock,
+    fetch_statuses_mock,
+    action_quit_mock: AsyncMock,
+    sectioned_app,
+):
+    async with sectioned_app.run_test() as pilot:
+        # WHEN
+        await pilot.press('ctrl+c')
+        await pilot.pause()
+        # THEN
+        action_quit_mock.assert_not_awaited()
+        # WHEN
+        await pilot.press('ctrl+c')
+        await pilot.pause()
+        # THEN
+        action_quit_mock.assert_awaited_once()
+
+
+@patch('jiratui.app.JiraApp.action_quit')
+@patch('jiratui.widgets.screen.MainScreen.fetch_statuses')
+@patch('jiratui.widgets.screen.MainScreen.fetch_issue_types')
+@patch('jiratui.widgets.screen.MainScreen.fetch_projects')
+@pytest.mark.asyncio
+async def test_two_slow_ctrl_c_presses_do_not_quit(
+    fetch_projects_mock,
+    fetch_issue_types_mock,
+    fetch_statuses_mock,
+    action_quit_mock: AsyncMock,
+    sectioned_app,
+):
+    from jiratui.app import DOUBLE_CTRL_C_SECONDS
+
+    async with sectioned_app.run_test() as pilot:
+        await pilot.press('ctrl+c')
+        await pilot.pause()
+        sectioned_app._last_ctrl_c_time -= DOUBLE_CTRL_C_SECONDS + 1
+        # WHEN
+        await pilot.press('ctrl+c')
+        await pilot.pause()
+        # THEN
+        action_quit_mock.assert_not_awaited()

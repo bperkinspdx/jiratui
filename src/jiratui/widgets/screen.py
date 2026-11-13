@@ -29,6 +29,7 @@ from jiratui.utils.logging import JiraTUILogger
 from jiratui.utils.search import build_jql_query, get_work_item_search_fields
 from jiratui.utils.ui_actions import Actionable, UIAction
 from jiratui.utils.urls import build_external_url_for_issue
+from jiratui.utils.views import fields_for_status_sections
 from jiratui.widgets.attachments.attachments import IssueAttachmentsWidget, WorkItemAttachments
 from jiratui.widgets.comments.comments import IssueCommentsWidget, WorkItemComments
 from jiratui.widgets.commons.users import JiraUserInput, UsersAutoComplete
@@ -934,9 +935,7 @@ class MainScreen(Actionable, Screen):
                 next_page_token=next_page_token,
                 limit=self.app.config.search_results_per_page,  # type:ignore[attr-defined]
                 order_by=order_by,
-                fields=get_work_item_search_fields(
-                    self.app.config.search_results_columns  # type:ignore[attr-defined]
-                ),
+                fields=self._search_result_fields(),
             )
         else:
             response = await self.api.search_issues_by_page_number(
@@ -951,9 +950,7 @@ class MainScreen(Actionable, Screen):
                 page=page,
                 limit=self.app.config.search_results_per_page,  # type:ignore[attr-defined]
                 order_by=order_by,
-                fields=get_work_item_search_fields(
-                    self.app.config.search_results_columns  # type:ignore[attr-defined]
-                ),
+                fields=self._search_result_fields(),
             )
 
         if not response.success or response.result is None:
@@ -1002,7 +999,14 @@ class MainScreen(Actionable, Screen):
     async def _search_single_issue(self, issue_key: str) -> WorkItemSearchResult:
         response: APIControllerResponse = await self.api.get_issue(
             issue_id_or_key=issue_key,
-            fields=['summary', 'status', 'issuetype', 'parent', 'assignee'],
+            fields=[
+                'summary',
+                'status',
+                'issuetype',
+                'parent',
+                'assignee',
+                *fields_for_status_sections(self.app.config.status_sections),  # type:ignore[attr-defined]
+            ],
         )
         if not response.success:
             self.notify(
@@ -1079,6 +1083,14 @@ class MainScreen(Actionable, Screen):
 
     # NEW - Actionable Logic
 
+    def _search_result_fields(self) -> list[str]:
+        """Returns the fields every work item search retrieves: those the columns show and those grouping needs."""
+
+        return [
+            *get_work_item_search_fields(self.app.config.search_results_columns),  # type:ignore[attr-defined]
+            *fields_for_status_sections(self.app.config.status_sections),  # type:ignore[attr-defined]
+        ]
+
     def _clear_work_item_panes(self) -> None:
         """Empties every pane that shows the selected work item, so the next selection fetches it afresh."""
 
@@ -1148,9 +1160,7 @@ class MainScreen(Actionable, Screen):
         try:
             response: APIControllerResponse = await self.api.search_view_work_items(
                 view,
-                fields=get_work_item_search_fields(
-                    self.app.config.search_results_columns  # type:ignore[attr-defined]
-                ),
+                fields=self._search_result_fields(),
                 max_results=self.app.config.view_max_results,  # type:ignore[attr-defined]
             )
         finally:

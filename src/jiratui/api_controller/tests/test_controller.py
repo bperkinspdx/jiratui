@@ -1290,6 +1290,7 @@ async def test_get_issue(get_issue_mock: Mock, jira_api_controller: APIControlle
     assert response.result.issues[0].status == IssueStatus(
         name='In Progress',
         id='10001',
+        category_key='indeterminate',
     )
     assert response.result.issues[0].project == Project(
         id='10000', name='Test Project', key='SCRUM'
@@ -1655,6 +1656,7 @@ async def test_search_issues(
     assert response.result.issues[0].status == IssueStatus(
         name='In Progress',
         id='10001',
+        category_key='indeterminate',
     )
     assert response.result.issues[0].project == Project(
         id='10000', name='Test Project', key='SCRUM'

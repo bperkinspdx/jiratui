@@ -176,6 +176,10 @@ def test_standard_action_reload_view():
     assert KEY_BINDINGS_STANDARD.get(SupportedActions.RELOAD_VIEW.value).get('keys') == ['alt+r']
 
 
+def test_standard_action_toggle_section():
+    assert KEY_BINDINGS_STANDARD.get(SupportedActions.TOGGLE_SECTION.value).get('keys') == ['space']
+
+
 def test_standard_action_filter():
     assert set(KEY_BINDINGS_STANDARD.get(SupportedActions.FILTER.value).get('keys')) == {'f', '.'}
 
@@ -549,6 +553,10 @@ def test_legacy_action_load_view():
 
 def test_legacy_action_reload_view():
     assert KEY_BINDINGS_LEGACY.get(SupportedActions.RELOAD_VIEW.value).get('keys') == ['alt+r']
+
+
+def test_legacy_action_toggle_section():
+    assert KEY_BINDINGS_LEGACY.get(SupportedActions.TOGGLE_SECTION.value).get('keys') == ['space']
 
 
 def test_legacy_action_filter():

@@ -15,6 +15,12 @@ loaded with `alt+1`…`alt+9` or a click. A view loads all its work items, up to
 work items. `startup_view` loads a view when the application starts.
 - Add status sections: the new `status_sections` setting groups the search results into collapsible sections of
 statuses, each under a heading with its label and work item count.
+- Add label sections: a status section that names `labels` gathers the unfinished work items carrying them, whatever
+their status, so a Blocked section works without a Blocked status. A section's `color` sets its heading color.
+- Add `IssueStatus.category_key`, the key of the status category of a work item returned by a search.
+- Add `space` on a status section heading to collapse or expand the section, as `enter` does.
+- Add a quick double `ctrl+c` to quit, as `ctrl+q` does. The first press still does what `ctrl+c` does where the focus
+is.
 
 ### Removed
 

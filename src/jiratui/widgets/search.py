@@ -171,6 +171,7 @@ class IssuesSearchResultsTable(Actionable, DataTable, inherit_bindings=False):  
         SupportedActions.CURSOR_LEFT,
         SupportedActions.CURSOR_RIGHT,
         SupportedActions.OPEN_CONTEXT_MENU,
+        SupportedActions.TOGGLE_SECTION,
     ]:
         data = key_bindings.get(supported_action_id.value, {})
         ACTIONS.append(
@@ -307,8 +308,8 @@ class IssuesSearchResultsTable(Actionable, DataTable, inherit_bindings=False):  
     ) -> None:
         """Adds a heading row for every non-empty status section, followed by its work items unless it is collapsed.
 
-        The heading shows the section's label and work item count in the first column after the number, colored like
-        the status of its first work item.
+        The heading shows the section's label and work item count in the first column after the number, in the
+        section's configured color or else the color of the status of its first work item.
         """
 
         position = 0
@@ -317,7 +318,9 @@ class IssuesSearchResultsTable(Actionable, DataTable, inherit_bindings=False):  
             row_key = f'{SECTION_ROW_KEY_PREFIX}{index}'
             self._rendered_sections[row_key] = (section.label, collapsed)
             style = 'bold'
-            if self.app.config.search_results_style_work_item_status:  # type:ignore[attr-defined]
+            if section.color:
+                style = f'bold {section.color}'
+            elif self.app.config.search_results_style_work_item_status:  # type:ignore[attr-defined]
                 style = f'bold {get_style_for_work_item_status(section.work_items[0].status_name)}'
             self.add_row(
                 Text('▶' if collapsed else '▼', style=style.strip()),
@@ -335,6 +338,15 @@ class IssuesSearchResultsTable(Actionable, DataTable, inherit_bindings=False):  
                 )
                 self.add_row(position, *cells, key=f'{work_item.id}#{work_item.key}')
                 self._row_key_by_position[position] = f'{work_item.id}#{work_item.key}'
+
+    def action_toggle_section(self) -> None:
+        """Collapses or expands the section whose heading is under the cursor; on a work item it does nothing."""
+
+        if not self.row_count:
+            return
+        row_key = str(self.ordered_rows[self.cursor_row].key.value)
+        if row_key.startswith(SECTION_ROW_KEY_PREFIX):
+            self.toggle_section(row_key)
 
     def toggle_section(self, row_key: str) -> None:
         """Collapses or expands the status section whose heading has `row_key`, keeping the cursor on the heading."""

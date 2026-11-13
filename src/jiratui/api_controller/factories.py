@@ -126,7 +126,11 @@ class WorkItemFactory:
             )
             if priority
             else None,
-            status=IssueStatus(id=str(status.get('id')), name=status.get('name')),
+            status=IssueStatus(
+                id=str(status.get('id')),
+                name=status.get('name'),
+                category_key=(status.get('statusCategory') or {}).get('key'),
+            ),
             assignee=JiraUser(
                 account_id=assignee.get('accountId'),
                 active=assignee.get('active'),

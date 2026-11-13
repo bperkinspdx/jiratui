@@ -82,6 +82,7 @@ class SupportedActions(Enum):
     SELECT_CURSOR = 'select_cursor'
     SERVER_INFO = 'server_info'
     SHOW_RECENT_HISTORY = 'show_recent_history'
+    TOGGLE_SECTION = 'toggle_section'
     UNLINK_WORK_ITEM = 'unlink_work_item'
     VIEW_CONTENT = 'view_content'
     VIEW_WORKLOG = 'view_worklog'
@@ -265,6 +266,12 @@ KEY_BINDINGS_LEGACY = {
         'tooltip': 'Loads the active view again',
     },
     # search results bindings - begin
+    SupportedActions.TOGGLE_SECTION.value: {
+        'keys': ['space'],
+        'show': False,
+        'description': 'Toggle Section',
+        'tooltip': 'Collapses or expands the status section whose heading is under the cursor',
+    },
     SupportedActions.FILTER.value: {
         'keys': ['.'],
         'show': True,
@@ -754,6 +761,12 @@ KEY_BINDINGS_STANDARD = {
         'tooltip': 'Loads the active view again',
     },
     # Search Results Actions
+    SupportedActions.TOGGLE_SECTION.value: {
+        'keys': ['space'],
+        'show': False,
+        'description': 'Toggle Section',
+        'tooltip': 'Collapses or expands the status section whose heading is under the cursor',
+    },
     SupportedActions.FILTER.value: {
         'keys': ['f', '.'],
         'show': True,

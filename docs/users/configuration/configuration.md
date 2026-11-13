@@ -225,6 +225,28 @@ pull_requests:
   refresh_seconds: 120
 ```
 
+## Acting on Work Items
+
+`work_item_actions` sets how the keys that act on the highlighted work item behave: `P` picks it up (assigns it to you
+and moves it to `pick_up_status`), `>` and `<` move it to the adjacent board column your `status_sections` define, `O`
+opens its pull requests, and `C` hands it to Claude Code. A move goes only to the adjacent column, to the first of its
+statuses, in their configured order, that the workflow reaches, so list each column's main status first.
+
+Handing a work item to Claude Code opens a Windows Terminal tab that runs `claude_command`, with `{key}` replaced by
+the work item's key, in PowerShell. The tab starts in the folder `repositories` gives for the repository of the work
+item's pull request; without one, you pick from `repositories`, the first offered first. Only work items in
+`claude_statuses` can be handed over.
+
+```yaml
+work_item_actions:
+  pick_up_status: 'In Progress'
+  claude_statuses: ['Ready', 'In Progress']
+  claude_command: 'claude "Work on {key}"'
+  repositories:
+    my-app: 'C:/src/my-app'
+    my-tools: 'C:/src/my-tools'
+```
+
 ## Enable Updating Additional Fields
 
 JiraTUI allows the users to update certain types of custom fields and system fields. Currently, the list of custom

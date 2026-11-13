@@ -56,10 +56,13 @@ class SupportedActions(Enum):
     FOCUS_WORK_ITEM_PULL_REQUESTS_TAB = 'focus_work_item_pull_requests_tab'
     FOCUS_WORK_ITEM_RELATED_TAB = 'focus_work_item_related_tab'
     FOCUS_WORK_ITEM_SUBTASKS_TAB = 'focus_work_item_subtasks_tab'
+    HAND_TO_CLAUDE = 'hand_to_claude'
     HELP = 'help'
     LINK_WORK_ITEM = 'link_work_item'
     LOAD_VIEW = 'load_view'
     LOG_WORK = 'log_work'
+    MOVE_TO_NEXT_COLUMN = 'move_to_next_column'
+    MOVE_TO_PREVIOUS_COLUMN = 'move_to_previous_column'
     NEXT_ISSUES_PAGE = 'next_issues_page'
     NEXT_TAB = 'next_tab'
     PREVIOUS_TAB = 'previous_tab'
@@ -67,9 +70,11 @@ class SupportedActions(Enum):
     OPEN_CONTEXT_MENU = 'open_context_menu'
     OPEN_GO_TO_SCREEN = 'open_go_to_screen'
     OPEN_IN_BROWSER = 'open_in_browser'
+    OPEN_PULL_REQUEST = 'open_pull_request'
     OPEN_TEXT_EDITOR = 'open_text_editor'
     PAGE_DOWN = 'page_down'
     PAGE_UP = 'page_up'
+    PICK_UP = 'pick_up'
     PREVIOUS_ISSUES_PAGE = 'previous_issues_page'
     RELOAD_VIEW = 'reload_view'
     SAVE_CONTENT = 'save_content'
@@ -271,6 +276,36 @@ KEY_BINDINGS_LEGACY = {
         'show': False,
         'description': 'Reload',
         'tooltip': 'Loads the active view again; with no view active, reads the pull requests on display again',
+    },
+    SupportedActions.PICK_UP.value: {
+        'keys': ['P'],
+        'show': False,
+        'description': 'Pick Up',
+        'tooltip': 'Assigns the selected work item to you and moves it to the pick-up status',
+    },
+    SupportedActions.MOVE_TO_NEXT_COLUMN.value: {
+        'keys': ['greater_than_sign'],
+        'show': False,
+        'description': 'Next Column',
+        'tooltip': 'Moves the selected work item to the next board column it can reach',
+    },
+    SupportedActions.MOVE_TO_PREVIOUS_COLUMN.value: {
+        'keys': ['less_than_sign'],
+        'show': False,
+        'description': 'Previous Column',
+        'tooltip': 'Moves the selected work item to the previous board column it can reach',
+    },
+    SupportedActions.OPEN_PULL_REQUEST.value: {
+        'keys': ['O'],
+        'show': False,
+        'description': 'Open PR',
+        'tooltip': "Opens the selected work item's open pull requests in the browser",
+    },
+    SupportedActions.HAND_TO_CLAUDE.value: {
+        'keys': ['C'],
+        'show': False,
+        'description': 'Claude',
+        'tooltip': 'Opens a Windows Terminal tab where Claude Code starts on the selected work item',
     },
     # search results bindings - begin
     SupportedActions.TOGGLE_SECTION.value: {
@@ -772,6 +807,36 @@ KEY_BINDINGS_STANDARD = {
         'show': False,
         'description': 'Reload',
         'tooltip': 'Loads the active view again; with no view active, reads the pull requests on display again',
+    },
+    SupportedActions.PICK_UP.value: {
+        'keys': ['P'],
+        'show': False,
+        'description': 'Pick Up',
+        'tooltip': 'Assigns the selected work item to you and moves it to the pick-up status',
+    },
+    SupportedActions.MOVE_TO_NEXT_COLUMN.value: {
+        'keys': ['greater_than_sign'],
+        'show': False,
+        'description': 'Next Column',
+        'tooltip': 'Moves the selected work item to the next board column it can reach',
+    },
+    SupportedActions.MOVE_TO_PREVIOUS_COLUMN.value: {
+        'keys': ['less_than_sign'],
+        'show': False,
+        'description': 'Previous Column',
+        'tooltip': 'Moves the selected work item to the previous board column it can reach',
+    },
+    SupportedActions.OPEN_PULL_REQUEST.value: {
+        'keys': ['O'],
+        'show': False,
+        'description': 'Open PR',
+        'tooltip': "Opens the selected work item's open pull requests in the browser",
+    },
+    SupportedActions.HAND_TO_CLAUDE.value: {
+        'keys': ['C'],
+        'show': False,
+        'description': 'Claude',
+        'tooltip': 'Opens a Windows Terminal tab where Claude Code starts on the selected work item',
     },
     # Search Results Actions
     SupportedActions.TOGGLE_SECTION.value: {

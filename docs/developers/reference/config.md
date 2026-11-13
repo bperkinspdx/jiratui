@@ -28,6 +28,11 @@
 ```{autodoc2-object} jiratui.config.PullRequestsConfiguration
 ```
 
+# WorkItemActionsConfiguration
+
+```{autodoc2-object} jiratui.config.WorkItemActionsConfiguration
+```
+
 # CONFIGURATION
 
 ```{autodoc2-object} jiratui.config.CONFIGURATION

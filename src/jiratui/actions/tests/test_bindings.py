@@ -1,3 +1,5 @@
+import pytest
+
 from jiratui.actions.constants import KEY_BINDINGS_LEGACY, KEY_BINDINGS_STANDARD, SupportedActions
 
 
@@ -180,6 +182,21 @@ def test_standard_action_focus_work_item_pull_requests_tab():
     assert KEY_BINDINGS_STANDARD.get(SupportedActions.FOCUS_WORK_ITEM_PULL_REQUESTS_TAB.value).get(
         'keys'
     ) == ['9']
+
+
+@pytest.mark.parametrize(
+    'action, keys',
+    [
+        (SupportedActions.PICK_UP, ['P']),
+        (SupportedActions.MOVE_TO_NEXT_COLUMN, ['greater_than_sign']),
+        (SupportedActions.MOVE_TO_PREVIOUS_COLUMN, ['less_than_sign']),
+        (SupportedActions.OPEN_PULL_REQUEST, ['O']),
+        (SupportedActions.HAND_TO_CLAUDE, ['C']),
+    ],
+)
+def test_work_item_actions_in_both_styles(action, keys):
+    assert KEY_BINDINGS_STANDARD.get(action.value).get('keys') == keys
+    assert KEY_BINDINGS_LEGACY.get(action.value).get('keys') == keys
 
 
 def test_standard_action_toggle_section():

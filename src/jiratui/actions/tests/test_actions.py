@@ -93,6 +93,16 @@ def bindings() -> dict:
     return get_application_key_bindings()
 
 
+WORK_ITEM_ACTIONS = [
+    'pick_up',
+    'move_to_next_column',
+    'move_to_previous_column',
+    'open_pull_request',
+    'hand_to_claude',
+]
+"""The main screen's actions on the highlighted work item, in the order it declares them."""
+
+
 @pytest.mark.parametrize(
     'key, widget',
     [
@@ -5385,6 +5395,16 @@ def test_main_screen_actions_and_bindings(bindings: dict):
             show=False,
             tooltip='Loads the active view again; with no view active, reads the pull requests on display again',
         ),
+        *[
+            UIAction(
+                action=action,
+                keys=bindings.get(action, {}).get('keys', []),
+                description=bindings.get(action, {}).get('description'),
+                show=False,
+                tooltip=bindings.get(action, {}).get('tooltip', ''),
+            )
+            for action in WORK_ITEM_ACTIONS
+        ],
     ]
     assert MainScreen.BINDINGS == [
         Binding(
@@ -5699,6 +5719,16 @@ def test_main_screen_actions_and_bindings(bindings: dict):
             system=False,
             group=None,
         ),
+        *[
+            Binding(
+                key=bindings.get(action, {}).get('keys', [])[0],
+                action=action,
+                description=bindings.get(action, {}).get('description'),
+                show=False,
+                tooltip=bindings.get(action, {}).get('tooltip', ''),
+            )
+            for action in WORK_ITEM_ACTIONS
+        ],
     ] + [
         Binding(key=key, action=f'load_view({position})', show=False)
         for position, key in enumerate(bindings.get('load_view', {}).get('keys', []), start=1)

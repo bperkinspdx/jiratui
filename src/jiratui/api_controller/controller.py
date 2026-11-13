@@ -33,6 +33,7 @@ from jiratui.constants import (
     LOGGER_NAME,
 )
 from jiratui.exceptions import (
+    APIException,
     ServiceInvalidResponseException,
     ServiceUnavailableException,
     UpdateWorkItemException,
@@ -2064,6 +2065,29 @@ class APIController:
                     )
                 )
         return APIControllerResponse(result=transitions)
+
+    async def assign_work_item(self, issue_id_or_key: str, user: str) -> APIControllerResponse:
+        """Assigns a work item to a user.
+
+        Args:
+            issue_id_or_key: the (case-sensitive) key of the work item.
+            user: the account ID of the user in Jira Cloud, or the username in Jira Data Center.
+
+        Returns:
+            An instance of `APIControllerResponse(success=True)` if the work item was assigned;
+            `APIControllerResponse(success=False)` with the error otherwise.
+        """
+        payload = {'accountId': user} if self.config.cloud else {'name': user}
+        try:
+            await self.api.assign_issue(issue_id_or_key, payload)
+        except APIException as e:
+            exception_details: dict = self._extract_exception_details(e)
+            self.logger.error(
+                'Unable to assign the work item',
+                extra={'issue_id_or_key': issue_id_or_key, **exception_details.get('extra', {})},
+            )
+            return APIControllerResponse(success=False, error=exception_details.get('message'))
+        return APIControllerResponse()
 
     async def transition_issue_status(
         self, issue_id_or_key: str, status_id: str

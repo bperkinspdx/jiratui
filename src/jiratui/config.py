@@ -152,6 +152,33 @@ class PullRequestsConfiguration(BaseModel):
     """How often the pull requests of the work items on display, and of the selected one, are read again."""
 
 
+class WorkItemActionsConfiguration(BaseModel):
+    """How the action keys on the selected work item behave.
+
+    E.g.:
+    ```yaml
+    work_item_actions:
+      pick_up_status: 'In Progress'
+      claude_statuses: ['Ready', 'In Progress']
+      claude_command: 'claude "/ssi-dev-beta:wi-workflow {key}"'
+      repositories:
+        app: 'C:/src/app'
+        tools: 'C:/src/tools'
+    ```
+    """
+
+    pick_up_status: str = 'In Progress'
+    """The status a work item moves to when it is picked up."""
+    claude_statuses: list[str] = Field(default_factory=lambda: ['Ready', 'In Progress'])
+    """The statuses whose work items can be handed to Claude Code."""
+    claude_command: str = 'claude "Work on {key}"'
+    """The PowerShell command a new Windows Terminal tab runs to hand a work item to Claude Code; `{key}` is the work
+    item's key."""
+    repositories: dict[str, str] = Field(default_factory=dict)
+    """The local folder of each repository, by GitHub repository name. Claude Code starts in the folder of the work
+    item's pull request repository; for a work item without one, the user picks a folder, the first offered first."""
+
+
 class ApplicationConfiguration(BaseSettings):
     """The configuration for the JiraTUI application and CLI tool."""
 
@@ -310,6 +337,10 @@ class ApplicationConfiguration(BaseSettings):
     item that carries a label a section names goes to that section; any other work item goes to the section naming its
     status. A status that no section names gets a section of its own after these. Sections with no work items are left
     out."""
+    work_item_actions: WorkItemActionsConfiguration = Field(
+        default_factory=WorkItemActionsConfiguration
+    )
+    """How the keys that pick up, move, and hand to Claude Code the selected work item behave."""
     pull_requests: PullRequestsConfiguration | None = None
     """When set, the search results show a PR column and the selected work item a PRs tab, for the pull requests Jira's
     development panel links to each work item. Their state is read from GitHub as the account `gh` is signed in to,

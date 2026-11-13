@@ -221,6 +221,10 @@ context.
 | `alt+1`…`alt+9` | Loads the configured view in that position                               | Main Screen                                                             |
 | `alt+r`      | Loads the active view again                                                 | Main Screen                                                             |
 | `space`      | Collapses or expands the status section under the cursor                    | Search results                                                          |
+| `P`          | Picks up the highlighted work item: assigns it to you and moves it to In Progress | Main Screen                                                       |
+| `>` `<`      | Moves the highlighted work item to the next or previous board column        | Main Screen                                                             |
+| `O`          | Opens the highlighted work item's pull requests in the browser              | Main Screen                                                             |
+| `C`          | Hands the highlighted work item to Claude Code in a new Windows Terminal tab | Main Screen                                                            |
 | `alt+p`      | Focuses the project dropdown                                                | Main Screen                                                             |
 | `alt+t`      | Focuses the work item types dropdown                                        | Main Screen                                                             |
 | `alt+s`      | Focuses the work item statuses dropdown                                     | Main Screen                                                             |
@@ -328,6 +332,10 @@ context.
 | `alt+1`…`alt+9`     | Loads the configured view in that position               |         |
 | `alt+r`             | Loads the active view again                              |         |
 | `space`             | Collapses or expands the status section under the cursor |         |
+| `P`                 | Picks up the highlighted work item                       |         |
+| `>` `<`             | Moves the highlighted work item to the next or previous board column |         |
+| `O`                 | Opens the highlighted work item's pull requests          |         |
+| `C`                 | Hands the highlighted work item to Claude Code           |         |
 | `.`                 | Filter work items in the search results table            |         |
 | `alt+left`          | Go to the previous page                                  |         |
 | `alt+right`         | Go to the next page                                      |         |

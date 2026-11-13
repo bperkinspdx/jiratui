@@ -1083,6 +1083,25 @@ class JiraAPI:
             method=httpx.AsyncClient.get, url=f'issue/{issue_id_or_key}/transitions'
         )
 
+    async def assign_issue(self, issue_id_or_key: str, payload: dict) -> None:
+        """Assigns a work item to a user.
+
+        **See Also**:
+        - [api-rest-api-3-issue-issueidorkey-assignee-put](https://developer.atlassian.com/cloud/jira/platform/rest/v3/api-group-issues/#api-rest-api-3-issue-issueidorkey-assignee-put)
+
+        Args:
+            issue_id_or_key: the case-sensitive key of the work item.
+            payload: the user, `{'accountId': ...}` in Jira Cloud or `{'name': ...}` in Jira Data Center.
+
+        Returns:
+            None
+        """
+        await self._client.make_request(
+            method=httpx.AsyncClient.put,
+            url=f'issue/{issue_id_or_key}/assignee',
+            data=json.dumps(payload),
+        )
+
     async def transition_issue(self, issue_id_or_key: str, transition_id: str) -> None:
         """Performs an issue transition.
 

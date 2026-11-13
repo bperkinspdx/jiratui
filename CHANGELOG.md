@@ -26,6 +26,10 @@ PRs tab (`9`), for the pull requests Jira's development panel links to each work
 checks, approval, unanswered teammate feedback, unresolved Qodo threads, open Arnica risks and the stacked-on work item;
 the tab lists each one's feedback by source, with Qodo's findings read through the Qodo CLI. Both refresh every
 `refresh_seconds`, and `alt+r` refreshes them when no view is active.
+- Add keys that act on the highlighted work item: `P` picks it up (assigns it to you and moves it to In Progress), `>`
+and `<` move it along the board columns the status sections define, `O` opens its pull requests, and `C` hands it to
+Claude Code in a new Windows Terminal tab in its pull request's repository folder. The new `work_item_actions` setting
+configures them.
 
 ### Removed
 

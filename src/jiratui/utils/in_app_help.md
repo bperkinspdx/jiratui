@@ -30,6 +30,10 @@ context.
 | `alt+1`…`alt+9` | Loads the configured view in that position          | Main Screen                                                             |
 | `alt+r`      | Loads the active view again                            | Main Screen                                                             |
 | `space`      | Collapses or expands the status section under the cursor | Search results                                                        |
+| `P`          | Picks up the highlighted work item: assigns it to you and moves it to In Progress | Main Screen                                  |
+| `>` `<`      | Moves the highlighted work item to the next or previous board column | Main Screen                                                 |
+| `O`          | Opens the highlighted work item's pull requests in the browser | Main Screen                                                       |
+| `C`          | Hands the highlighted work item to Claude Code in a new Windows Terminal tab | Main Screen                                         |
 | `alt+p`      | Focuses the project dropdown                           | Main Screen                                                             |
 | `alt+t`      | Focuses the work item types dropdown                   | Main Screen                                                             |
 | `alt+s`      | Focuses the work item statuses dropdown                | Main Screen                                                             |
@@ -137,6 +141,10 @@ context.
 | `alt+1`…`alt+9`         | Loads the configured view in that position               |         |
 | `alt+r`                 | Loads the active view again                              |         |
 | `space`                 | Collapses or expands the status section under the cursor |         |
+| `P`                     | Picks up the highlighted work item                       |         |
+| `>` `<`                 | Moves the highlighted work item to the next or previous board column |         |
+| `O`                     | Opens the highlighted work item's pull requests          |         |
+| `C`                     | Hands the highlighted work item to Claude Code           |         |
 | `.`                     | Filter work items in the search results table            |         |
 | `alt+left`              | Go to the previous page                                  |         |
 | `alt+right`             | Go to the next page                                      |         |
@@ -393,6 +401,21 @@ The PR column shows the open pull requests, or the last one when none is open:
 The PRs tab shows each pull request's branches, checks and review decision, then its feedback by source: teammates
 (unanswered first, resolved dimmed), Qodo's findings from its review session through the Qodo CLI (closed ones
 dimmed), and Arnica's code risks.
+
+# Acting on the Highlighted Work Item
+
+These keys act on the work item highlighted in the search results, then show the results afresh:
+
+- `P` picks it up: assigns it to you, then moves it to the status `work_item_actions.pick_up_status` names (In Progress
+  by default) when the workflow allows that move.
+- `>` and `<` move it to the adjacent board column, never further. The columns are the status sections that name
+  statuses, in their configured order, and the target is the first of the adjacent column's statuses, in their
+  configured order, that the workflow reaches. When it reaches none, the work item stays where it is.
+- `O` opens its open pull requests, else its last one, in the browser. This needs the `pull_requests` setting.
+- `C` hands it to Claude Code: a new Windows Terminal tab opens in the folder of the work item's pull request repository
+  and runs `work_item_actions.claude_command`. Without a pull request, or with one whose repository has no folder in
+  `work_item_actions.repositories`, it asks which folder. Only work items in `work_item_actions.claude_statuses` can be
+  handed over. The app runs no git command; Claude Code does any branching.
 
 # Creating Work Items
 

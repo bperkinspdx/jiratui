@@ -1,6 +1,9 @@
 from dataclasses import dataclass
 from datetime import date
 import logging
+from pathlib import Path
+import shutil
+import subprocess
 
 from dateutil.parser import isoparse  # type:ignore[import-untyped]
 from textual import on
@@ -62,6 +65,7 @@ from jiratui.widgets.screens.context_menu import (
     ContextMenuSelection,
 )
 from jiratui.widgets.screens.history import HistoryScreen
+from jiratui.widgets.screens.repository_picker import RepositoryPickerScreen
 from jiratui.widgets.screens.text_search import TextSearchScreen
 from jiratui.widgets.screens.work_item_quick_view import WorkItemQuickViewScreen
 from jiratui.widgets.search import (
@@ -76,11 +80,19 @@ from jiratui.widgets.work_item_subtasks.subtasks import (
     SubtasksWidget,
     WorkItemSubtasks,
 )
+from jiratui.work_item_actions import (
+    claude_launch_arguments,
+    find_column_transition,
+    find_transition_to_status,
+    pull_request_repository,
+    pull_request_urls,
+)
 
 VIEWS_WORKER_GROUP = 'views'
 """Loading a view cancels only an earlier view load, never the workers that fill the search filters."""
 PULL_REQUESTS_WORKER_GROUP = 'pull-requests'
 PULL_REQUEST_DETAILS_WORKER_GROUP = 'pull-request-details'
+WORK_ITEM_ACTIONS_WORKER_GROUP = 'work-item-actions'
 
 
 @dataclass
@@ -147,6 +159,11 @@ class MainScreen(Actionable, Screen):
         SupportedActions.SHOW_RECENT_HISTORY,
         SupportedActions.FOCUS_WORK_ITEM_PULL_REQUESTS_TAB,
         SupportedActions.RELOAD_VIEW,
+        SupportedActions.PICK_UP,
+        SupportedActions.MOVE_TO_NEXT_COLUMN,
+        SupportedActions.MOVE_TO_PREVIOUS_COLUMN,
+        SupportedActions.OPEN_PULL_REQUEST,
+        SupportedActions.HAND_TO_CLAUDE,
     ]:
         data = key_bindings.get(supported_action_id.value, {})
         ACTIONS.append(
@@ -1250,6 +1267,261 @@ class MainScreen(Actionable, Screen):
     async def action_focus_work_item_pull_requests_tab(self) -> None:
         if widget := self.pull_requests_widget:
             self.set_focus(widget)
+
+    def _selected_work_item(self) -> JiraIssue | None:
+        """Returns the work item highlighted in the search results; with none, says so and returns `None`."""
+
+        table = self.search_results_table
+        results = table.get_initial_results_set()
+        work_item = next(
+            (
+                item
+                for item in (results.issues if results else [])
+                if item.key == table.current_work_item_key
+            ),
+            None,
+        )
+        if work_item is None:
+            self.notify('Highlight a work item in the search results first.', title='Work Item')
+        return work_item
+
+    def _reload_results(self) -> None:
+        """Shows the search results afresh after a work item changed: the active view, else the last search."""
+
+        if self.active_view is not None:
+            self.action_load_view(self.active_view)
+        else:
+            self.run_worker(self.action_search())
+
+    def _run_work_item_action(self, action) -> None:
+        self.run_worker(action, group=WORK_ITEM_ACTIONS_WORKER_GROUP)
+
+    def action_pick_up(self) -> None:
+        """Assigns the highlighted work item to the user and moves it to the pick-up status."""
+
+        if work_item := self._selected_work_item():
+            self._run_work_item_action(self.pick_up(work_item))
+
+    def action_move_to_next_column(self) -> None:
+        """Moves the highlighted work item to the next board column it can reach."""
+
+        if work_item := self._selected_work_item():
+            self._run_work_item_action(self.move_to_column(work_item, 1))
+
+    def action_move_to_previous_column(self) -> None:
+        """Moves the highlighted work item to the previous board column it can reach."""
+
+        if work_item := self._selected_work_item():
+            self._run_work_item_action(self.move_to_column(work_item, -1))
+
+    def action_open_pull_request(self) -> None:
+        """Opens the highlighted work item's open pull requests, else its last one, in the browser."""
+
+        if work_item := self._selected_work_item():
+            self._run_work_item_action(self.open_pull_requests(work_item))
+
+    def action_hand_to_claude(self) -> None:
+        """Opens a Windows Terminal tab where Claude Code starts on the highlighted work item."""
+
+        if not (work_item := self._selected_work_item()):
+            return
+        settings = self.app.config.work_item_actions  # type:ignore[attr-defined]
+        allowed = {status.casefold() for status in settings.claude_statuses}
+        if work_item.status_name.casefold() not in allowed:
+            self.notify(
+                f'Claude Code takes {", ".join(settings.claude_statuses)} work items; '
+                f'{work_item.key} is {work_item.status_name}.',
+                title='Claude Code',
+                severity='warning',
+            )
+            return
+        self._run_work_item_action(self.hand_to_claude(work_item))
+
+    async def _my_user(self) -> str | None:
+        """Returns the user to assign work to: the configured account ID, else the API user's account or username."""
+
+        if account_id := self.app.config.jira_account_id:  # type:ignore[attr-defined]
+            return account_id
+        response: APIControllerResponse = await self.api.myself()
+        if not response.success or response.result is None:
+            return None
+        if self.app.config.cloud:  # type:ignore[attr-defined]
+            return response.result.account_id
+        return response.result.username
+
+    async def pick_up(self, work_item: JiraIssue) -> None:
+        """Assigns `work_item` to the user, then moves it to the pick-up status when the workflow allows it."""
+
+        status = self.app.config.work_item_actions.pick_up_status  # type:ignore[attr-defined]
+        user = await self._my_user()
+        if not user:
+            self.notify('Your Jira user could not be found.', title='Pick Up', severity='error')
+            return
+        assigned: APIControllerResponse = await self.api.assign_work_item(work_item.key, user)
+        if not assigned.success:
+            self.notify(
+                assigned.error or 'The work item could not be assigned.',
+                title='Pick Up',
+                severity='error',
+            )
+            return
+        if work_item.status_name.casefold() == status.casefold():
+            self.notify(
+                f'{work_item.key} is yours; it was already {work_item.status_name}.',
+                title='Pick Up',
+            )
+            self._reload_results()
+            return
+        transitions: APIControllerResponse = await self.api.transitions(work_item.key)
+        transition = (
+            find_transition_to_status(transitions.result or [], status)
+            if transitions.success
+            else None
+        )
+        if transition is None:
+            self.notify(
+                f'{work_item.key} is yours, but the workflow does not let it move from '
+                f'{work_item.status_name} to {status}.',
+                title='Pick Up',
+                severity='warning',
+            )
+        else:
+            moved: APIControllerResponse = await self.api.transition_issue_status(
+                work_item.key, transition.to_state.id
+            )
+            if moved.success:
+                self.notify(
+                    f'{work_item.key} is yours and {transition.to_state.name}.', title='Pick Up'
+                )
+            else:
+                self.notify(
+                    f'{work_item.key} is yours, but it did not move to {status}: {moved.error}',
+                    title='Pick Up',
+                    severity='warning',
+                )
+        self._reload_results()
+
+    async def move_to_column(self, work_item: JiraIssue, step: int) -> None:
+        """Moves `work_item` to the nearest reachable board column after (`step=1`) or before (`step=-1`) its own."""
+
+        direction = 'next' if step > 0 else 'previous'
+        sections = self.app.config.status_sections or []  # type:ignore[attr-defined]
+        if not any(section.statuses and not section.labels for section in sections):
+            self.notify(
+                'Moving along the board needs status_sections that name statuses.',
+                title='Move',
+                severity='warning',
+            )
+            return
+        transitions: APIControllerResponse = await self.api.transitions(work_item.key)
+        if not transitions.success:
+            self.notify(
+                transitions.error or 'The transitions could not be read.',
+                title='Move',
+                severity='error',
+            )
+            return
+        transition = find_column_transition(
+            work_item.status_name, sections, transitions.result or [], step
+        )
+        if transition is None:
+            self.notify(
+                f'{work_item.key} cannot move to a {direction} column from {work_item.status_name}.',
+                title='Move',
+                severity='warning',
+            )
+            return
+        moved: APIControllerResponse = await self.api.transition_issue_status(
+            work_item.key, transition.to_state.id
+        )
+        if not moved.success:
+            self.notify(
+                moved.error or 'The work item did not move.', title='Move', severity='error'
+            )
+            return
+        self.notify(f'{work_item.key} moved to {transition.to_state.name}.', title='Move')
+        self._reload_results()
+
+    async def _work_item_pull_requests(self, work_item: JiraIssue) -> WorkItemPullRequests | None:
+        """Returns the work item's pull requests, read now when the last badge refresh did not cover it."""
+
+        if self.pull_request_service is None:
+            return None
+        if (summary := self._pull_request_summaries.get(work_item.key)) is None:
+            summaries = await self.pull_request_service.summaries([(work_item.id, work_item.key)])
+            summary = self._pull_request_summaries[work_item.key] = summaries[work_item.key]
+        return summary
+
+    async def open_pull_requests(self, work_item: JiraIssue) -> None:
+        """Opens `work_item`'s open pull requests, else its last one, in the browser."""
+
+        if self.pull_request_service is None:
+            self.notify(
+                'Opening pull requests needs the pull_requests setting.',
+                title='Open PR',
+                severity='warning',
+            )
+            return
+        urls = pull_request_urls(await self._work_item_pull_requests(work_item))
+        if not urls:
+            self.notify(f'No pull request is linked to {work_item.key}.', title='Open PR')
+            return
+        for url in urls:
+            self.app.open_url(url)
+        self.notify(f'Opening {len(urls)} pull request(s) of {work_item.key}.', title='Open PR')
+
+    async def hand_to_claude(self, work_item: JiraIssue) -> None:
+        """Starts Claude Code on `work_item` in its pull request's repository, or in a repository the user picks."""
+
+        repositories: dict[str, str] = self.app.config.work_item_actions.repositories  # type:ignore[attr-defined]
+        repository = pull_request_repository(await self._work_item_pull_requests(work_item))
+        if repository and (folder := repositories.get(repository)):
+            self._launch_claude(work_item.key, folder)
+            return
+        if not repositories:
+            self.notify(
+                'Handing work items to Claude Code needs work_item_actions.repositories.',
+                title='Claude Code',
+                severity='warning',
+            )
+            return
+
+        def launch_in(folder: str | None) -> None:
+            if folder:
+                self._launch_claude(work_item.key, folder)
+
+        await self.app.push_screen(
+            RepositoryPickerScreen(work_item.key, repositories), callback=launch_in
+        )
+
+    def _launch_claude(self, work_item_key: str, folder: str) -> None:
+        """Opens a Windows Terminal tab in `folder` running the configured Claude Code command for the work item."""
+
+        terminal = shutil.which('wt')
+        shell = shutil.which('pwsh') or shutil.which('powershell')
+        if terminal is None or shell is None:
+            self.notify(
+                'Handing a work item to Claude Code needs Windows Terminal (wt) and PowerShell.',
+                title='Claude Code',
+                severity='error',
+            )
+            return
+        if not Path(folder).is_dir():
+            self.notify(
+                f'The folder {folder} does not exist.', title='Claude Code', severity='error'
+            )
+            return
+        command = self.app.config.work_item_actions.claude_command.replace('{key}', work_item_key)  # type:ignore[attr-defined]
+        try:
+            subprocess.Popen(
+                claude_launch_arguments(terminal, shell, folder, work_item_key, command)
+            )
+        except OSError as error:
+            self.notify(
+                f'Windows Terminal did not start: {error}', title='Claude Code', severity='error'
+            )
+            return
+        self.notify(f'Claude Code is starting on {work_item_key} in {folder}.', title='Claude Code')
 
     async def load_view(self, position: int) -> None:
         """Searches every work item of the view at `position` and shows them, unpaged, in the search results.

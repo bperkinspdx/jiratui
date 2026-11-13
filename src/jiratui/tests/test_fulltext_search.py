@@ -17,6 +17,7 @@ from jiratui.widgets.screens.text_search import TextSearchScreen
 def app() -> JiraApp:
     config_mock = Mock(spec=ApplicationConfiguration)
     config_mock.configure_mock(
+        pull_requests=None,
         views=None,
         startup_view=None,
         view_max_results=200,

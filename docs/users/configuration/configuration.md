@@ -207,6 +207,24 @@ status_sections:
     statuses: ['In Progress']
 ```
 
+## Showing Pull Requests
+
+Set `pull_requests` to show the pull requests Jira's development panel links to each work item: a PR column in the
+search results, with a badge per work item, and a PRs tab for the selected one. Their state is read from GitHub's
+GraphQL API as the account the GitHub CLI (`gh`) is signed in to, or with `GH_TOKEN` when it is set, and Qodo's review
+through the Qodo CLI when it is installed. Both are read again every `refresh_seconds`, and `alt+r` reads them again at
+once when no view is active.
+
+`application_type` is where Jira's development panel files the pull requests. For the GitHub for Jira app it is the
+app's instance type: open `/rest/dev-status/latest/issue/summary?issueId=<id>` on your Jira site for a work item with a
+pull request and use the key under `pullrequest.byInstanceType`.
+
+```yaml
+pull_requests:
+  application_type: 'oAuth-com.github.integration.production'
+  refresh_seconds: 120
+```
+
 ## Enable Updating Additional Fields
 
 JiraTUI allows the users to update certain types of custom fields and system fields. Currently, the list of custom

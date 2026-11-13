@@ -64,6 +64,7 @@ def jira_users() -> list[JiraUser]:
 def app() -> JiraApp:
     config_mock = Mock(spec=ApplicationConfiguration)
     config_mock.configure_mock(
+        pull_requests=None,
         views=None,
         startup_view=None,
         view_max_results=200,
@@ -173,6 +174,7 @@ async def test_show_keybinding_hints(
             'attachments': 'Attachments (6)',
             'issue_remote_links': 'Links (7)',
             'issue_subtasks': 'Subtasks (8)',
+            'pull_requests': 'PRs (9)',
         }
         widget = main_screen.query_one(SearchResultsContainer)
         assert widget.border_title == 'Work Items (1)'

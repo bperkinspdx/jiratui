@@ -24,6 +24,8 @@ from jiratui.models import (
     WorkItemArchivalSyncResponse,
     WorkItemsSearchOrderBy,
 )
+from jiratui.pull_requests.models import WorkItemPullRequests
+from jiratui.pull_requests.service import PullRequestService
 from jiratui.utils.history import HistoryEntry
 from jiratui.utils.logging import JiraTUILogger
 from jiratui.utils.search import build_jql_query, get_work_item_search_fields
@@ -47,6 +49,7 @@ from jiratui.widgets.filters import (
     WorkItemInputWidget,
 )
 from jiratui.widgets.messages import SearchWorkItem
+from jiratui.widgets.pull_requests import PullRequestsWidget, pull_request_badge
 from jiratui.widgets.related_work_items.related_issues import (
     RelatedIssuesWidget,
     WorkItemRelatedItems,
@@ -76,6 +79,8 @@ from jiratui.widgets.work_item_subtasks.subtasks import (
 
 VIEWS_WORKER_GROUP = 'views'
 """Loading a view cancels only an earlier view load, never the workers that fill the search filters."""
+PULL_REQUESTS_WORKER_GROUP = 'pull-requests'
+PULL_REQUEST_DETAILS_WORKER_GROUP = 'pull-request-details'
 
 
 @dataclass
@@ -140,6 +145,7 @@ class MainScreen(Actionable, Screen):
         SupportedActions.FIND_BY_TEXT,
         SupportedActions.CREATE_WORK_ITEM,
         SupportedActions.SHOW_RECENT_HISTORY,
+        SupportedActions.FOCUS_WORK_ITEM_PULL_REQUESTS_TAB,
         SupportedActions.RELOAD_VIEW,
     ]:
         data = key_bindings.get(supported_action_id.value, {})
@@ -202,6 +208,15 @@ class MainScreen(Actionable, Screen):
         self.active_view: int | None = None
         """The 1-based position in `config.views` of the view the search results show; `None` after any other
         search."""
+        self.pull_request_service: PullRequestService | None = None
+        if settings := self.app.config.pull_requests:  # type:ignore[attr-defined]
+            self.pull_request_service = PullRequestService(
+                self.api.api.client,
+                self.app.config.jira_api_base_url,  # type:ignore[attr-defined]
+                settings.application_type,
+            )
+        self._pull_request_summaries: dict[str, WorkItemPullRequests] = {}
+        """The pull requests last read for each work item on display, by key, with their stacking resolved."""
         self.current_key_bindings: dict[str, dict] = get_application_key_bindings()
         self.work_item_tabs_titles: dict = {}
         if self.app.config.show_keybinding_hints:  # type:ignore[attr-defined]
@@ -214,6 +229,7 @@ class MainScreen(Actionable, Screen):
                 'attachments': f'Attachments ({self.current_key_bindings.get(SupportedActions.FOCUS_WORK_ITEM_ATTACHMENTS_TAB.value, {}).get("keys", [])[0]})',
                 'issue_remote_links': f'Links ({self.current_key_bindings.get(SupportedActions.FOCUS_WORK_ITEM_LINKS_TAB.value, {}).get("keys", [])[0]})',
                 'issue_subtasks': f'Subtasks ({self.current_key_bindings.get(SupportedActions.FOCUS_WORK_ITEM_SUBTASKS_TAB.value, {}).get("keys", [])[0]})',
+                'pull_requests': f'PRs ({self.current_key_bindings.get(SupportedActions.FOCUS_WORK_ITEM_PULL_REQUESTS_TAB.value, {}).get("keys", [])[0]})',
             }
         self.logger = JiraTUILogger(logging.getLogger(LOGGER_NAME), self.app.config.enable_logging)  # type:ignore[attr-defined]
 
@@ -312,6 +328,10 @@ class MainScreen(Actionable, Screen):
     @property
     def views_bar(self) -> ViewsBar | None:
         return self.query_one_optional(ViewsBar)
+
+    @property
+    def pull_requests_widget(self) -> PullRequestsWidget | None:
+        return self.query_one_optional(PullRequestsWidget)
 
     def compose(self) -> ComposeResult:
         """Composes the widgets of the application's main screen.
@@ -464,6 +484,9 @@ class MainScreen(Actionable, Screen):
                         title=self.work_item_tabs_titles.get('issue_subtasks', 'Subtasks')
                     ):
                         yield SubtasksWidget()
+                    if self.pull_request_service is not None:
+                        with TabPane(title=self.work_item_tabs_titles.get('pull_requests', 'PRs')):
+                            yield PullRequestsWidget()
         yield Footer(show_command_palette=False, compact=True)
 
     async def on_mount(self) -> None:
@@ -561,6 +584,11 @@ class MainScreen(Actionable, Screen):
 
         # fetch the list of projects
         workers: list[Worker] = [self.run_worker(self.fetch_projects())]
+        if self.pull_request_service is not None:
+            self.set_interval(
+                self.app.config.pull_requests.refresh_seconds,  # type:ignore[attr-defined]
+                self._refresh_pull_requests,
+            )
         # if there is an initial value for the project key the worker that fetches the projects will trigger fetching
         # status codes and work item types after the project dropdown is updated with the selection.
         # the same happens when the user configures the app to fetch only projects on start up
@@ -1070,6 +1098,7 @@ class MainScreen(Actionable, Screen):
             'current_page_number': self.search_results_table.page,
         }
         self.run_button.loading = False
+        self._start_pull_request_badges()
 
     @on(Button.Pressed, '#run-button')
     async def handle_run_button(self) -> None:
@@ -1102,6 +1131,8 @@ class MainScreen(Actionable, Screen):
         self.issue_remote_links_widget.issue_key = None
         self.issue_attachments_widget.attachments = None
         self.issue_child_work_items_widget.issues = None
+        if widget := self.pull_requests_widget:
+            widget.clear()
 
     def _set_active_view(self, position: int | None) -> None:
         """Marks the view at `position` as the one the search results show, or no view when `position` is `None`."""
@@ -1136,12 +1167,89 @@ class MainScreen(Actionable, Screen):
             self.run_worker(self.load_view(position), exclusive=True, group=VIEWS_WORKER_GROUP)
 
     def action_reload_view(self) -> None:
-        """Loads the active view again."""
+        """Loads the active view again; with no view active, reads the pull requests on display again."""
 
-        if self.active_view is None:
+        if self.active_view is not None:
+            self.action_load_view(self.active_view)
+        elif self.pull_request_service is not None:
+            self._refresh_pull_requests()
+        else:
             self.notify('No view is active. Load one with its key first.', title='Views')
+
+    def _refresh_pull_requests(self) -> None:
+        """Reads again the pull requests of the work items on display; the PRs tab follows the new read."""
+
+        self._start_pull_request_badges()
+
+    def _start_pull_request_badges(self) -> None:
+        if self.pull_request_service is not None:
+            self.run_worker(
+                self.refresh_pull_request_badges(),
+                exclusive=True,
+                group=PULL_REQUESTS_WORKER_GROUP,
+            )
+
+    async def refresh_pull_request_badges(self) -> None:
+        """Reads the pull requests of every work item in the search results and shows each one's PR badge."""
+
+        if self.pull_request_service is None:
             return
-        self.action_load_view(self.active_view)
+        results = self.search_results_table.get_initial_results_set()
+        if not results or not results.issues:
+            return
+        summaries = await self.pull_request_service.summaries(
+            [(work_item.id, work_item.key) for work_item in results.issues]
+        )
+        self._pull_request_summaries.update(summaries)
+        self.search_results_table.set_pull_request_badges(
+            {key: pull_request_badge(work_item) for key, work_item in summaries.items()}
+        )
+        if (widget := self.pull_requests_widget) and (shown := widget.work_item_key) in summaries:
+            self.run_worker(
+                self._show_pull_request_details(summaries[shown]),
+                exclusive=True,
+                group=PULL_REQUEST_DETAILS_WORKER_GROUP,
+            )
+
+    async def load_pull_request_details(self, work_item_id: str, work_item_key: str) -> None:
+        """Shows in the PRs tab the pull requests of a work item, with Qodo's review of each open one.
+
+        The pull requests the last badge refresh read are used when there are any; otherwise they are read now.
+
+        Args:
+            work_item_id: the ID of the work item.
+            work_item_key: the key of the work item.
+
+        Returns:
+            None
+        """
+
+        widget = self.pull_requests_widget
+        if self.pull_request_service is None or widget is None:
+            return
+        widget.show_loading(work_item_key)
+        summary = self._pull_request_summaries.get(work_item_key)
+        if summary is None:
+            summaries = await self.pull_request_service.summaries([(work_item_id, work_item_key)])
+            summary = summaries[work_item_key]
+        await self._show_pull_request_details(summary)
+
+    async def _show_pull_request_details(self, summary: WorkItemPullRequests) -> None:
+        """Shows `summary` in the PRs tab at once, keeping Qodo's last review there, then with Qodo's review read again."""
+
+        widget = self.pull_requests_widget
+        if self.pull_request_service is None or widget is None:
+            return
+        if widget.work_item_key != summary.work_item_key:
+            return
+        widget.show(widget.with_shown_qodo_reviews(summary))
+        detailed = await self.pull_request_service.with_qodo_reviews(summary)
+        if widget.work_item_key == summary.work_item_key:
+            widget.show(detailed)
+
+    async def action_focus_work_item_pull_requests_tab(self) -> None:
+        if widget := self.pull_requests_widget:
+            self.set_focus(widget)
 
     async def load_view(self, position: int) -> None:
         """Searches every work item of the view at `position` and shows them, unpaged, in the search results.
@@ -1188,6 +1296,7 @@ class MainScreen(Actionable, Screen):
         }
         if views_bar := self.views_bar:
             views_bar.set_count(position, len(results.issues))
+        self._start_pull_request_badges()
         if results.is_last is False:
             self.notify(
                 f'Showing the first {len(results.issues)} work items. Raise view_max_results to load more.',
@@ -1507,6 +1616,14 @@ class MainScreen(Actionable, Screen):
 
         # step 8: populate subtasks tab
         self.run_worker(self.retrieve_issue_subtasks(work_item))
+
+        # step 9: populate the pull requests tab
+        if self.pull_request_service is not None:
+            self.run_worker(
+                self.load_pull_request_details(work_item.id, work_item.key),
+                exclusive=True,
+                group=PULL_REQUEST_DETAILS_WORKER_GROUP,
+            )
 
         if self.app.config.enable_recent_history:  # type:ignore[attr-defined]
             self.app.add_to_recent_history(  # type:ignore[attr-defined]

@@ -19,7 +19,7 @@ class HelpScreen(ModalScreen):
         self._content = None
         try:
             in_app_help_filename = self._get_in_app_help_filename()
-            with open(in_app_help_filename, 'r') as file:
+            with open(in_app_help_filename, 'r', encoding='utf-8') as file:
                 self._content = file.read()
         except FileNotFoundError:
             self._content = 'Unable to load the contents of the help. Please refer to https://jiratui.readthedocs.io/en/latest/index.html'

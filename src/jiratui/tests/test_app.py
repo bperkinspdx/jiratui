@@ -18,6 +18,7 @@ from jiratui.widgets.screens.server import ServerInfoScreen
 def app_with_unrecognized_config_theme() -> JiraApp:
     config_mock = Mock(spec=ApplicationConfiguration)
     config_mock.configure_mock(
+        pull_requests=None,
         views=None,
         startup_view=None,
         view_max_results=200,
@@ -60,6 +61,7 @@ def app_with_unrecognized_config_theme() -> JiraApp:
 def app_with_input_and_config_theme() -> JiraApp:
     config_mock = Mock(spec=ApplicationConfiguration)
     config_mock.configure_mock(
+        pull_requests=None,
         views=None,
         startup_view=None,
         view_max_results=200,
@@ -102,6 +104,7 @@ def app_with_input_and_config_theme() -> JiraApp:
 def app_with_input_theme() -> JiraApp:
     config_mock = Mock(spec=ApplicationConfiguration)
     config_mock.configure_mock(
+        pull_requests=None,
         views=None,
         startup_view=None,
         view_max_results=200,
@@ -144,6 +147,7 @@ def app_with_input_theme() -> JiraApp:
 def app_without_config_theme() -> JiraApp:
     config_mock = Mock(spec=ApplicationConfiguration)
     config_mock.configure_mock(
+        pull_requests=None,
         views=None,
         startup_view=None,
         view_max_results=200,
@@ -186,6 +190,7 @@ def app_without_config_theme() -> JiraApp:
 def app() -> JiraApp:
     config_mock = Mock(spec=ApplicationConfiguration)
     config_mock.configure_mock(
+        pull_requests=None,
         views=None,
         startup_view=None,
         view_max_results=200,
@@ -581,6 +586,7 @@ async def test_application_with_unrecognized_config_theme(
 def config_dict() -> dict:
     """Base configuration dictionary for testing."""
     return {
+        'pull_requests': None,
         'views': None,
         'startup_view': None,
         'view_max_results': 200,

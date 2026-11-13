@@ -242,6 +242,7 @@ context.
 | `6`          | Focuses the attachments tab                                                 | Main Screen                                                             |
 | `7`          | Focuses the web links tab                                                   | Main Screen                                                             |
 | `8`          | Focuses the work item subtasks tab                                          | Main Screen                                                             |
+| `9`          | Focuses the pull requests tab                                               | Main Screen                                                             |
 | `^n`         | Creates a new work item                                                     | Main Screen                                                             |
 | `y`          | Copy the work item key                                                      | Main Screen                                                             |
 | `^c`         | Copy the work item URL                                                      | Main Screen                                                             |
@@ -319,6 +320,7 @@ context.
 | `6`                 | Focuses the attachments tab                              |         |
 | `7`                 | Focuses the web links tab                                |         |
 | `8`                 | Focuses the work item subtasks tab                       |         |
+| `9`                 | Focuses the pull requests tab                            |         |
 | `^n`                | Creates a new work item                                  |         |
 | `f7`                | Shows the recent history                                 |         |
 | `^k`                | Copy the work item key                                   |         |

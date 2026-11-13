@@ -53,6 +53,7 @@ class SupportedActions(Enum):
     FOCUS_WORK_ITEM_DETAILS_TAB = 'focus_work_item_details_tab'
     FOCUS_WORK_ITEM_INFORMATION_TAB = 'focus_work_item_information_tab'
     FOCUS_WORK_ITEM_LINKS_TAB = 'focus_work_item_links_tab'
+    FOCUS_WORK_ITEM_PULL_REQUESTS_TAB = 'focus_work_item_pull_requests_tab'
     FOCUS_WORK_ITEM_RELATED_TAB = 'focus_work_item_related_tab'
     FOCUS_WORK_ITEM_SUBTASKS_TAB = 'focus_work_item_subtasks_tab'
     HELP = 'help'
@@ -229,6 +230,12 @@ KEY_BINDINGS_LEGACY = {
         'description': 'Focuses the work item subtasks tab',
         'tooltip': 'Focuses the work item subtasks tab',
     },
+    SupportedActions.FOCUS_WORK_ITEM_PULL_REQUESTS_TAB.value: {
+        'keys': ['9'],
+        'show': False,
+        'description': 'Focuses the pull requests tab',
+        'tooltip': 'Focuses the pull requests tab',
+    },
     SupportedActions.CREATE_WORK_ITEM.value: {
         'keys': ['ctrl+n'],
         'show': True,
@@ -262,8 +269,8 @@ KEY_BINDINGS_LEGACY = {
     SupportedActions.RELOAD_VIEW.value: {
         'keys': ['alt+r'],
         'show': False,
-        'description': 'Reload View',
-        'tooltip': 'Loads the active view again',
+        'description': 'Reload',
+        'tooltip': 'Loads the active view again; with no view active, reads the pull requests on display again',
     },
     # search results bindings - begin
     SupportedActions.TOGGLE_SECTION.value: {
@@ -708,6 +715,12 @@ KEY_BINDINGS_STANDARD = {
         'description': 'Focuses the work item subtasks tab',
         'tooltip': 'Focuses the work item subtasks tab',
     },
+    SupportedActions.FOCUS_WORK_ITEM_PULL_REQUESTS_TAB.value: {
+        'keys': ['9'],
+        'show': False,
+        'description': 'Focuses the pull requests tab',
+        'tooltip': 'Focuses the pull requests tab',
+    },
     # Item Creation
     SupportedActions.CREATE_WORK_ITEM.value: {
         'keys': ['ctrl+n'],
@@ -757,8 +770,8 @@ KEY_BINDINGS_STANDARD = {
     SupportedActions.RELOAD_VIEW.value: {
         'keys': ['alt+r'],
         'show': False,
-        'description': 'Reload View',
-        'tooltip': 'Loads the active view again',
+        'description': 'Reload',
+        'tooltip': 'Loads the active view again; with no view active, reads the pull requests on display again',
     },
     # Search Results Actions
     SupportedActions.TOGGLE_SECTION.value: {

@@ -29,6 +29,7 @@ from jiratui.utils.test_utilities import load_json_response
 def config_for_testing() -> ApplicationConfiguration:
     config_mock = Mock(spec=ApplicationConfiguration)
     config_mock.configure_mock(
+        pull_requests=None,
         views=None,
         startup_view=None,
         view_max_results=200,

@@ -51,6 +51,7 @@ context.
 | `6`          | Focuses the attachments tab                            | Main Screen                                                             |
 | `7`          | Focuses the web links tab                              | Main Screen                                                             |
 | `8`          | Focuses the work item subtasks tab                     | Main Screen                                                             |
+| `9`          | Focuses the pull requests tab                          | Main Screen                                                             |
 | `^n`         | Creates a new work item                                | Main Screen                                                             |
 | `y`          | Copy the work item key                                 | Main Screen                                                             |
 | `^c`         | Copy the work item URL                                 | Main Screen                                                             |
@@ -128,6 +129,7 @@ context.
 | `6`                     | Focuses the attachments tab                              |         |
 | `7`                     | Focuses the web links tab                                |         |
 | `8`                     | Focuses the work item subtasks tab                       |         |
+| `9`                     | Focuses the pull requests tab                            |         |
 | `^n`                    | Creates a new work item                                  |         |
 | `f7`                    | Shows the recent history                                 |         |
 | `^k`                    | Copy the work item key                                   |         |
@@ -368,6 +370,29 @@ of its own after the configured ones. Work items keep their numbers whether or n
 
 A section that names `labels` gathers the unfinished work items carrying any of those labels, whatever their status,
 e.g. a Blocked section for a workflow without a Blocked status.
+
+# Pull Requests
+
+When the configuration variable `pull_requests` is set, the search results gain a PR column and the work item tabs a
+PRs tab (`9`). They show the pull requests Jira's development panel links to each work item, read from GitHub as the
+account `gh` is signed in to, and read again every `refresh_seconds`; `alt+r` reads them again at once when no view is
+active.
+
+The PR column shows the open pull requests, or the last one when none is open:
+
+| Glyph       | Meaning                                                           |
+|-------------|-------------------------------------------------------------------|
+| `●` `◌` `◆` `✕` | open, draft, merged, closed                                   |
+| `✓3/5`      | all 5 checks passed; `…3/5` while some run; `✗1` one failing      |
+| `✔` `✎`     | approved, changes requested                                       |
+| `@2`        | two pieces of teammate feedback not answered                      |
+| `Q3`        | three Qodo threads not resolved                                   |
+| `⚠1`        | one Arnica code risk open                                         |
+| `↳ABC-12`   | stacked on the pull request of ABC-12                             |
+
+The PRs tab shows each pull request's branches, checks and review decision, then its feedback by source: teammates
+(unanswered first, resolved dimmed), Qodo's findings from its review session through the Qodo CLI (closed ones
+dimmed), and Arnica's code risks.
 
 # Creating Work Items
 

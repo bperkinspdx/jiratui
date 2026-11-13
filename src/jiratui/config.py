@@ -133,6 +133,25 @@ class WorkItemsViewConfiguration(BaseModel):
     and `jql` narrows them further."""
 
 
+class PullRequestsConfiguration(BaseModel):
+    """Where the pull requests linked to work items are read from, and how often.
+
+    E.g.:
+    ```yaml
+    pull_requests:
+      application_type: 'oAuth-com.github.integration.production'
+      refresh_seconds: 120
+    ```
+    """
+
+    application_type: str = 'GitHub'
+    """The `applicationType` Jira's development panel files the pull requests under. For the GitHub for Jira app it
+    is the app's instance type, which `/rest/dev-status/latest/issue/summary?issueId=<id>` lists under
+    `byInstanceType`."""
+    refresh_seconds: int = 120
+    """How often the pull requests of the work items on display, and of the selected one, are read again."""
+
+
 class ApplicationConfiguration(BaseSettings):
     """The configuration for the JiraTUI application and CLI tool."""
 
@@ -291,6 +310,10 @@ class ApplicationConfiguration(BaseSettings):
     item that carries a label a section names goes to that section; any other work item goes to the section naming its
     status. A status that no section names gets a section of its own after these. Sections with no work items are left
     out."""
+    pull_requests: PullRequestsConfiguration | None = None
+    """When set, the search results show a PR column and the selected work item a PRs tab, for the pull requests Jira's
+    development panel links to each work item. Their state is read from GitHub as the account `gh` is signed in to,
+    and Qodo's review through the Qodo CLI."""
     search_on_startup: bool = False
     """If `True`, triggers a search automatically when the UI starts. Can be set via CLI argument
     `--search-on-startup`."""
@@ -353,7 +376,7 @@ class ApplicationConfiguration(BaseSettings):
     ) -> tuple[PydanticBaseSettingsSource, ...]:
         conf_file = cls._get_config_file()
         return (
-            YamlConfigSettingsSource(settings_cls, yaml_file=conf_file),
+            YamlConfigSettingsSource(settings_cls, yaml_file=conf_file, yaml_file_encoding='utf-8'),
             env_settings,
             dotenv_settings,
             init_settings,

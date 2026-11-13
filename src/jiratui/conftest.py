@@ -27,6 +27,7 @@ from jiratui.models import (
 def config_for_testing() -> ApplicationConfiguration:
     config_mock = Mock(spec=ApplicationConfiguration)
     config_mock.configure_mock(
+        pull_requests=None,
         views=None,
         startup_view=None,
         view_max_results=200,
@@ -68,6 +69,7 @@ def config_for_testing() -> ApplicationConfiguration:
 def config_for_testing_jira_dc() -> ApplicationConfiguration:
     config_mock = Mock(spec=ApplicationConfiguration)
     config_mock.configure_mock(
+        pull_requests=None,
         views=None,
         startup_view=None,
         view_max_results=200,
@@ -106,6 +108,7 @@ def config_for_testing_jira_dc() -> ApplicationConfiguration:
 def jira_api_controller() -> APIController:
     config_mock = Mock(spec=ApplicationConfiguration)
     config_mock.configure_mock(
+        pull_requests=None,
         views=None,
         startup_view=None,
         view_max_results=200,
@@ -145,6 +148,7 @@ def jira_api_controller() -> APIController:
 def jira_api_controller_for_jira_dc() -> APIController:
     config_mock = Mock(spec=ApplicationConfiguration)
     config_mock.configure_mock(
+        pull_requests=None,
         views=None,
         startup_view=None,
         view_max_results=200,
@@ -186,6 +190,7 @@ def app():
 
     config_mock = Mock(spec=ApplicationConfiguration)
     config_mock.configure_mock(
+        pull_requests=None,
         views=None,
         startup_view=None,
         view_max_results=200,

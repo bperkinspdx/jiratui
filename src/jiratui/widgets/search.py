@@ -115,6 +115,8 @@ class DataTableSearchInput(Input):
 SECTION_ROW_KEY_PREFIX = 'section:'
 """Prefixes the row key of every status section heading; work item rows use `<id>#<key>`."""
 
+PULL_REQUEST_COLUMN = 'PR'
+
 
 class IssuesSearchResultsTable(Actionable, DataTable, inherit_bindings=False):  # type:ignore[call-arg]
     """The widget that displays the results of a work item search.
@@ -233,6 +235,9 @@ class IssuesSearchResultsTable(Actionable, DataTable, inherit_bindings=False):  
         """Label and collapsed state of each section heading on display, by row key."""
         self._row_key_by_position: dict[int, str | None] = {}
         """The row key of every numbered work item, by its number; `None` while its section is collapsed."""
+        self.pull_request_badges: dict[str, Text] = {}
+        """The PR column's badge of each work item by key; it outlives a search so a row keeps its badge until the
+        next read of its pull requests."""
 
     def set_initial_results_set(self, data: JiraIssueSearchResponse | None = None):
         self._initial_results_set = data
@@ -270,6 +275,8 @@ class IssuesSearchResultsTable(Actionable, DataTable, inherit_bindings=False):  
         columns: list[str] = get_work_item_search_results_table_columns(
             self.app.config.search_results_columns  # type:ignore[attr-defined]
         )
+        if self.app.config.pull_requests:  # type:ignore[attr-defined]
+            columns = [*columns, PULL_REQUEST_COLUMN]
         self.add_column(label='#', key='index')
         for column in sorted(columns):
             self.add_column(label=column, key=column)
@@ -413,7 +420,25 @@ class IssuesSearchResultsTable(Actionable, DataTable, inherit_bindings=False):  
                 cells[column_name] = item.show_assignee(10)
             elif field_name == SearchFieldId.REPORTER.value:
                 cells[column_name] = item.show_reporter(10)
+        if self.app.config.pull_requests:  # type:ignore[attr-defined]
+            cells[PULL_REQUEST_COLUMN] = self.pull_request_badges.get(item.key, '')
         return [value for key, value in sorted(cells.items())]
+
+    def set_pull_request_badges(self, badges: dict[str, Text]) -> None:
+        """Records the PR badge of each work item by key and shows it in the rows on display."""
+
+        self.pull_request_badges.update(badges)
+        if PULL_REQUEST_COLUMN not in self.columns:
+            return
+        for row in self.ordered_rows:
+            row_key = str(row.key.value)
+            if row_key.startswith(SECTION_ROW_KEY_PREFIX):
+                continue
+            work_item_key = row_key.split('#')[1]
+            if work_item_key in badges:
+                self.update_cell(
+                    row_key, PULL_REQUEST_COLUMN, badges[work_item_key], update_width=True
+                )
 
     def on_data_table_row_selected(self, event: DataTable.RowSelected) -> None:
         """Fetches the details of the currently-selected item, or toggles the section of a selected heading."""

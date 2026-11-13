@@ -21,6 +21,11 @@ their status, so a Blocked section works without a Blocked status. A section's `
 - Add `space` on a status section heading to collapse or expand the section, as `enter` does.
 - Add a quick double `ctrl+c` to quit, as `ctrl+q` does. The first press still does what `ctrl+c` does where the focus
 is.
+- Add pull requests: with the new `pull_requests` setting the search results show a PR column and the work item tabs a
+PRs tab (`9`), for the pull requests Jira's development panel links to each work item. The column's badge shows state,
+checks, approval, unanswered teammate feedback, unresolved Qodo threads, open Arnica risks and the stacked-on work item;
+the tab lists each one's feedback by source, with Qodo's findings read through the Qodo CLI. Both refresh every
+`refresh_seconds`, and `alt+r` refreshes them when no view is active.
 
 ### Removed
 

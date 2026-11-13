@@ -24,7 +24,7 @@ def _load_keybindings_style_from_configuration_file() -> str:
     except FileNotFoundError:
         return 'legacy'
     else:
-        with open(config_file, 'r') as f:
+        with open(config_file, 'r', encoding='utf-8') as f:
             if yaml_data := yaml.safe_load(f):
                 style = yaml_data.get('key_bindings_style') or 'legacy'
             else:

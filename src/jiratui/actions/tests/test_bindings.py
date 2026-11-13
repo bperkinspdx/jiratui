@@ -176,6 +176,12 @@ def test_standard_action_reload_view():
     assert KEY_BINDINGS_STANDARD.get(SupportedActions.RELOAD_VIEW.value).get('keys') == ['alt+r']
 
 
+def test_standard_action_focus_work_item_pull_requests_tab():
+    assert KEY_BINDINGS_STANDARD.get(SupportedActions.FOCUS_WORK_ITEM_PULL_REQUESTS_TAB.value).get(
+        'keys'
+    ) == ['9']
+
+
 def test_standard_action_toggle_section():
     assert KEY_BINDINGS_STANDARD.get(SupportedActions.TOGGLE_SECTION.value).get('keys') == ['space']
 
@@ -553,6 +559,12 @@ def test_legacy_action_load_view():
 
 def test_legacy_action_reload_view():
     assert KEY_BINDINGS_LEGACY.get(SupportedActions.RELOAD_VIEW.value).get('keys') == ['alt+r']
+
+
+def test_legacy_action_focus_work_item_pull_requests_tab():
+    assert KEY_BINDINGS_LEGACY.get(SupportedActions.FOCUS_WORK_ITEM_PULL_REQUESTS_TAB.value).get(
+        'keys'
+    ) == ['9']
 
 
 def test_legacy_action_toggle_section():

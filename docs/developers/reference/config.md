@@ -23,6 +23,11 @@
 ```{autodoc2-object} jiratui.config.StatusSectionConfiguration
 ```
 
+# PullRequestsConfiguration
+
+```{autodoc2-object} jiratui.config.PullRequestsConfiguration
+```
+
 # CONFIGURATION
 
 ```{autodoc2-object} jiratui.config.CONFIGURATION
